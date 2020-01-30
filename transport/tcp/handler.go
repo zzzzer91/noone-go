@@ -1,25 +1,33 @@
 package tcp
 
 import (
+	"github.com/kataras/golog"
 	"net"
 	"noone/transport"
+	"sync"
 )
 
-func handleConn(conn net.Conn) {
-	c := transport.New(conn)
-	if c.Stage == transport.StageInit {
-		c.HandleStageInit()
+func handle(pool *sync.Pool, conn net.Conn) {
+	c := pool.Get().(*transport.Ctx)
+	c.ClientConn = conn
+
+	defer pool.Put(c)
+	defer c.Destroy()
+
+	if err := c.HandleStageInit(); err != nil {
+		golog.Error(err)
+		return
 	}
-	if c.Stage == transport.StageHeader {
-		c.HandleStageHeader()
+	if err := c.HandleStageParseHeader(); err != nil {
+		golog.Error(err)
+		return
 	}
-	if c.Stage == transport.StageDns {
-		c.HandleStageDns()
+	if err := c.HandleStageHandShake(); err != nil {
+		golog.Error(err)
+		return
 	}
-	if c.Stage == transport.StageHandShake {
-		c.HandleStageHandShake()
-	}
-	if c.Stage == transport.StageStream {
-		c.HandleStream()
+	if err := c.HandleStream(); err != nil {
+		golog.Error(err)
+		return
 	}
 }

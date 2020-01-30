@@ -19,10 +19,9 @@ const (
 const (
 	StageInit      = iota // 获取 iv 阶段
 	StageHeader           // 解析 header 阶段，获取 remote 的 ip 和 port
-	StageDns              // 查询 DNS，可能不进行这一步
 	StageHandShake        // TCP 和 remote 握手阶段
 	StageStream           // 传输阶段
-	StageDestroyed        // 该连接所有资源已销毁，就剩释放 ctx 对象内存
+	StageDestroyed        // 该连接所有资源已销毁，就剩释放 Ctx 对象内存
 )
 
 // atyp
@@ -32,35 +31,48 @@ const (
 	AtypIpv6   = 0x04
 )
 
-type ctx struct {
+type Ctx struct {
 	Stage        int
-	RemoteDomain string
-	RemoteIp     net.IP
+	RemoteHost   []byte
 	RemotePort   int
 	ClientConn   net.Conn
 	RemoteConn   net.Conn
-	Cipher       crypto.Cipher
-	Iv           []byte
-	ClientBuf    []byte
-	ClientBufLen int
-	RemoteBuf    []byte
-	RemoteBufLen int
+	cipher       crypto.Cipher
+	iv           []byte
+	clientBuf    []byte
+	clientBufLen int
+	remoteBuf    []byte
+	remoteBufLen int
 }
 
-func New(conn net.Conn) *ctx {
-	return &ctx{
-		Stage:      StageInit,
-		ClientConn: conn,
-		ClientBuf:  make([]byte, ClientBufCapacity),
-		RemoteBuf:  make([]byte, RemoteBufCapacity),
+func New() *Ctx {
+	return &Ctx{
+		Stage:     StageInit,
+		clientBuf: make([]byte, ClientBufCapacity),
+		remoteBuf: make([]byte, RemoteBufCapacity),
 	}
 }
 
-func (c *ctx) IsDestroyed() bool {
-	return c.Stage == StageDestroyed
+func (c *Ctx) CloseClientConn() {
 }
 
-func (c *ctx) ReadClient() error {
+func (c *Ctx) CloseRemoteConn() {
+}
+
+func (c *Ctx) Destroy() {
+	c.Stage = StageInit
+	c.RemoteHost = nil
+	c.RemotePort = 0
+	_ = c.ClientConn.Close()
+	_ = c.RemoteConn.Close()
+	c.ClientConn = nil
+	c.RemoteConn = nil
+	c.cipher = nil
+	c.clientBufLen = 0
+	c.remoteBufLen = 0
+}
+
+func (c *Ctx) ReadClient() error {
 	err := c.ClientConn.SetReadDeadline(time.Now().Add(time.Minute * 2))
 	if err != nil {
 		return err
@@ -70,57 +82,57 @@ func (c *ctx) ReadClient() error {
 	if err != nil {
 		return err
 	}
-	c.ClientBufLen = n
-	c.Cipher.Decrypt(c.ClientBuf, temp[:n])
+	c.clientBufLen = n
+	c.cipher.Decrypt(c.clientBuf, temp[:n])
 	return nil
 }
 
-func (c *ctx) WriteRemote() error {
-	if c.ClientBufLen > 0 {
+func (c *Ctx) WriteRemote() error {
+	if c.clientBufLen > 0 {
 		err := c.RemoteConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
 		if err != nil {
 			return err
 		}
-		n, err := c.RemoteConn.Write(c.ClientBuf[:c.ClientBufLen])
+		n, err := c.RemoteConn.Write(c.clientBuf[:c.clientBufLen])
 		if err != nil {
 			return err
 		}
-		c.ClientBufLen -= n
+		c.clientBufLen -= n
 	}
 	return nil
 }
 
-func (c *ctx) ReadRemote() error {
+func (c *Ctx) ReadRemote() error {
 	err := c.RemoteConn.SetReadDeadline(time.Now().Add(time.Minute * 2))
 	if err != nil {
 		return err
 	}
-	n, err := c.RemoteConn.Read(c.RemoteBuf)
+	n, err := c.RemoteConn.Read(c.remoteBuf)
 	if err != nil {
 		return err
 	}
-	c.RemoteBufLen = n
+	c.remoteBufLen = n
 	return nil
 }
 
-func (c *ctx) WriteClient() error {
-	if c.RemoteBufLen > 0 {
+func (c *Ctx) WriteClient() error {
+	if c.remoteBufLen > 0 {
 		err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
 		if err != nil {
 			return err
 		}
 		temp := make([]byte, RemoteBufCapacity)
-		c.Cipher.Encrypt(temp, c.RemoteBuf[:c.RemoteBufLen])
-		n, err := c.ClientConn.Write(temp[:c.RemoteBufLen])
+		c.cipher.Encrypt(temp, c.remoteBuf[:c.remoteBufLen])
+		n, err := c.ClientConn.Write(temp[:c.remoteBufLen])
 		if err != nil {
 			return err
 		}
-		c.RemoteBufLen -= n
+		c.remoteBufLen -= n
 	}
 	return nil
 }
 
-func (c *ctx) SendIv(iv []byte) error {
+func (c *Ctx) SendIv(iv []byte) error {
 	err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
 	if err != nil {
 		return err
@@ -132,25 +144,25 @@ func (c *ctx) SendIv(iv []byte) error {
 	return nil
 }
 
-func (c *ctx) HandleStageInit() error {
+func (c *Ctx) HandleStageInit() error {
 	iv := make([]byte, 16)
 	_, err := io.ReadFull(c.ClientConn, iv)
 	if err != nil {
 		return err
 	}
-	c.Cipher = crypto.New(crypto.Kdf(conf.S.Password, 16), iv)
+	c.cipher = crypto.New(crypto.Kdf(conf.S.Password, 16), iv)
 	err = c.ReadClient()
 	if err != nil {
 		return err
 	}
-	c.Iv = iv
+	c.iv = iv
 	c.Stage = StageHeader
 	return nil
 }
 
-func (c *ctx) HandleStageHeader() error {
-	temp := make([]byte, c.ClientBufLen)
-	copy(temp, c.ClientBuf)
+func (c *Ctx) HandleStageParseHeader() error {
+	temp := make([]byte, c.clientBufLen)
+	copy(temp, c.clientBuf)
 	offset := 0
 	atyp := temp[offset]
 	offset += 1
@@ -158,66 +170,47 @@ func (c *ctx) HandleStageHeader() error {
 	case AtypDomain:
 		domainLen := int(temp[offset])
 		offset += 1
-		domain := make([]byte, domainLen)
-		copy(domain, temp[offset:])
+		c.RemoteHost = make([]byte, domainLen)
+		copy(c.RemoteHost, temp[offset:])
 		offset += domainLen
-		c.RemoteDomain = string(domain)
-		c.Stage = StageDns
 	case AtypIpv4:
-		c.RemoteIp = make(net.IP, net.IPv4len)
-		copy(c.RemoteIp, temp[offset:])
+		c.RemoteHost = make([]byte, net.IPv4len)
+		copy(c.RemoteHost, temp[offset:])
 		offset += net.IPv4len
-		c.Stage = StageHandShake
 	case AtypIpv6:
-		c.RemoteIp = make(net.IP, net.IPv6len)
-		copy(c.RemoteIp, temp[offset:])
+		c.RemoteHost = make([]byte, net.IPv6len)
+		copy(c.RemoteHost, temp[offset:])
 		offset += net.IPv6len
-		c.Stage = StageHandShake
 	default:
 		return errors.New("error atyp")
 	}
 	c.RemotePort = (int(temp[offset]) << 8) | int(temp[offset+1])
 	offset += 2
-	copy(c.ClientBuf, temp[offset:])
-	c.ClientBufLen -= offset
-	return nil
-}
-
-func (c *ctx) HandleStageDns() error {
-	// 不会使用缓存
-	ipList, err := net.LookupIP(c.RemoteDomain)
-	if err != nil {
-		return err
-	}
-	c.RemoteIp = ipList[0]
+	copy(c.clientBuf, temp[offset:])
+	c.clientBufLen -= offset
 	c.Stage = StageHandShake
 	return nil
 }
 
-func (c *ctx) HandleStageHandShake() error {
-	addr := fmt.Sprintf("%s:%d", c.RemoteIp, c.RemotePort)
-	if c.RemoteDomain != "" {
-		golog.Infof("connecting: %s:%d", c.RemoteDomain, c.RemotePort)
-	} else {
-		golog.Infof("connecting: %s", addr)
-	}
+func (c *Ctx) HandleStageHandShake() error {
+	addr := fmt.Sprintf("%s:%d", c.RemoteHost, c.RemotePort)
+	golog.Infof("connecting: %s", addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
 	}
-
 	c.RemoteConn = conn
 	c.Stage = StageStream
 	return nil
 }
 
-func (c *ctx) HandleStream() error {
-	go func(c *ctx) {
+func (c *Ctx) HandleStream() error {
+	go func(c *Ctx) {
 		//iv := make([]byte, 16)
 		//if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		//	return
 		//}
-		if err := c.SendIv(c.Iv); err != nil {
+		if err := c.SendIv(c.iv); err != nil {
 			return
 		}
 		for {

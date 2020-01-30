@@ -5,6 +5,8 @@ import (
 	"github.com/kataras/golog"
 	"net"
 	"noone/conf"
+	"noone/transport"
+	"sync"
 )
 
 func Run() {
@@ -13,7 +15,11 @@ func Run() {
 	if err != nil {
 		golog.Fatal(err)
 	}
-
+	pool := sync.Pool{
+		New: func() interface{} {
+			return transport.New()
+		},
+	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -21,6 +27,6 @@ func Run() {
 			continue
 		}
 		golog.Debug("TCP accept: ", conn.RemoteAddr())
-		go handleConn(conn)
+		go handle(&pool, conn)
 	}
 }
