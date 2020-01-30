@@ -63,10 +63,14 @@ func (c *Ctx) Destroy() {
 	c.Stage = StageInit
 	c.RemoteHost = nil
 	c.RemotePort = 0
-	_ = c.ClientConn.Close()
-	_ = c.RemoteConn.Close()
-	c.ClientConn = nil
-	c.RemoteConn = nil
+	if c.ClientConn != nil {
+		_ = c.ClientConn.Close()
+		c.ClientConn = nil
+	}
+	if c.RemoteConn != nil {
+		_ = c.RemoteConn.Close()
+		c.RemoteConn = nil
+	}
 	c.cipher = nil
 	c.clientBufLen = 0
 	c.remoteBufLen = 0
