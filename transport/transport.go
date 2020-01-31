@@ -14,6 +14,7 @@ import (
 const (
 	ClientBufCapacity = 4 * 1024
 	RemoteBufCapacity = 4 * 1024
+	StreamTimeout     = 2 * time.Minute
 )
 
 const (
@@ -53,13 +54,7 @@ func New() *Ctx {
 	}
 }
 
-func (c *Ctx) CloseClientConn() {
-}
-
-func (c *Ctx) CloseRemoteConn() {
-}
-
-func (c *Ctx) Destroy() {
+func (c *Ctx) Reset() {
 	c.Stage = StageInit
 	c.RemoteHost = nil
 	c.RemotePort = 0
@@ -76,24 +71,26 @@ func (c *Ctx) Destroy() {
 	c.remoteBufLen = 0
 }
 
-func (c *Ctx) ReadClient() error {
-	err := c.ClientConn.SetReadDeadline(time.Now().Add(time.Minute * 2))
+func (c *Ctx) readClient() error {
+	err := c.ClientConn.SetReadDeadline(time.Now().Add(StreamTimeout))
 	if err != nil {
 		return err
 	}
-	temp := make([]byte, ClientBufCapacity)
-	n, err := c.ClientConn.Read(temp)
+	n, err := c.ClientConn.Read(c.clientBuf)
 	if err != nil {
+		if err.Error() == "EOF" {
+			return nil
+		}
 		return err
 	}
 	c.clientBufLen = n
-	c.cipher.Decrypt(c.clientBuf, temp[:n])
+	c.cipher.Decrypt(c.clientBuf, c.clientBuf[:n])
 	return nil
 }
 
-func (c *Ctx) WriteRemote() error {
+func (c *Ctx) writeRemote() error {
 	if c.clientBufLen > 0 {
-		err := c.RemoteConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
+		err := c.RemoteConn.SetWriteDeadline(time.Now().Add(StreamTimeout))
 		if err != nil {
 			return err
 		}
@@ -106,44 +103,34 @@ func (c *Ctx) WriteRemote() error {
 	return nil
 }
 
-func (c *Ctx) ReadRemote() error {
-	err := c.RemoteConn.SetReadDeadline(time.Now().Add(time.Minute * 2))
+func (c *Ctx) readRemote() error {
+	err := c.RemoteConn.SetReadDeadline(time.Now().Add(StreamTimeout))
 	if err != nil {
 		return err
 	}
 	n, err := c.RemoteConn.Read(c.remoteBuf)
 	if err != nil {
+		if err.Error() == "EOF" {
+			return nil
+		}
 		return err
 	}
 	c.remoteBufLen = n
 	return nil
 }
 
-func (c *Ctx) WriteClient() error {
+func (c *Ctx) writeClient() error {
 	if c.remoteBufLen > 0 {
-		err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
+		err := c.ClientConn.SetWriteDeadline(time.Now().Add(StreamTimeout))
 		if err != nil {
 			return err
 		}
-		temp := make([]byte, RemoteBufCapacity)
-		c.cipher.Encrypt(temp, c.remoteBuf[:c.remoteBufLen])
-		n, err := c.ClientConn.Write(temp[:c.remoteBufLen])
+		c.cipher.Encrypt(c.remoteBuf, c.remoteBuf[:c.remoteBufLen])
+		n, err := c.ClientConn.Write(c.remoteBuf[:c.remoteBufLen])
 		if err != nil {
 			return err
 		}
 		c.remoteBufLen -= n
-	}
-	return nil
-}
-
-func (c *Ctx) SendIv(iv []byte) error {
-	err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
-	if err != nil {
-		return err
-	}
-	_, err = c.ClientConn.Write(iv)
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -155,7 +142,7 @@ func (c *Ctx) HandleStageInit() error {
 		return err
 	}
 	c.cipher = crypto.New(crypto.Kdf(conf.S.Password, 16), iv)
-	err = c.ReadClient()
+	err = c.readClient()
 	if err != nil {
 		return err
 	}
@@ -208,30 +195,42 @@ func (c *Ctx) HandleStageHandShake() error {
 	return nil
 }
 
+func (c *Ctx) sendIv(iv []byte) error {
+	err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
+	if err != nil {
+		return err
+	}
+	_, err = c.ClientConn.Write(iv)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Ctx) HandleStream() error {
 	go func(c *Ctx) {
 		//iv := make([]byte, 16)
 		//if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		//	return
 		//}
-		if err := c.SendIv(c.iv); err != nil {
+		if err := c.sendIv(c.iv); err != nil {
 			return
 		}
 		for {
-			if err := c.ReadRemote(); err != nil {
+			if err := c.readRemote(); err != nil {
 				return
 			}
-			if err := c.WriteClient(); err != nil {
+			if err := c.writeClient(); err != nil {
 				return
 			}
 		}
 	}(c)
 
 	for {
-		if err := c.WriteRemote(); err != nil {
+		if err := c.writeRemote(); err != nil {
 			return err
 		}
-		if err := c.ReadClient(); err != nil {
+		if err := c.readClient(); err != nil {
 			return err
 		}
 	}
