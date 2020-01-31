@@ -167,7 +167,7 @@ func (c *Ctx) HandleStageParseHeader() error {
 	offset += hostLen
 	c.RemotePort = (int(temp[offset]) << 8) | int(temp[offset+1])
 	offset += 2
-	// TODO dst 和 src 不确定能否重叠
+	// dst 和 src 可以重叠
 	copy(c.clientBuf, temp[offset:])
 	c.clientBufLen -= offset
 	c.Stage = StageHandShake
