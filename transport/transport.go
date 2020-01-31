@@ -146,31 +146,28 @@ func (c *Ctx) HandleStageInit() error {
 }
 
 func (c *Ctx) HandleStageParseHeader() error {
-	temp := make([]byte, c.clientBufLen)
-	copy(temp, c.clientBuf)
+	temp := c.clientBuf
 	offset := 0
 	atyp := temp[offset]
 	offset += 1
+	hostLen := 0
 	switch atyp {
 	case AtypDomain:
-		domainLen := int(temp[offset])
+		hostLen = int(temp[offset])
 		offset += 1
-		c.RemoteHost = make([]byte, domainLen)
-		copy(c.RemoteHost, temp[offset:])
-		offset += domainLen
 	case AtypIpv4:
-		c.RemoteHost = make([]byte, net.IPv4len)
-		copy(c.RemoteHost, temp[offset:])
-		offset += net.IPv4len
+		hostLen = net.IPv4len
 	case AtypIpv6:
-		c.RemoteHost = make([]byte, net.IPv6len)
-		copy(c.RemoteHost, temp[offset:])
-		offset += net.IPv6len
+		hostLen = net.IPv6len
 	default:
 		return errors.New("error atyp")
 	}
+	c.RemoteHost = make([]byte, hostLen)
+	copy(c.RemoteHost, temp[offset:])
+	offset += hostLen
 	c.RemotePort = (int(temp[offset]) << 8) | int(temp[offset+1])
 	offset += 2
+	// TODO dst 和 src 不确定能否重叠
 	copy(c.clientBuf, temp[offset:])
 	c.clientBufLen -= offset
 	c.Stage = StageHandShake
