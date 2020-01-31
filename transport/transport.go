@@ -179,7 +179,7 @@ func (c *Ctx) HandleStageParseHeader() error {
 
 func (c *Ctx) HandleStageHandShake() error {
 	addr := fmt.Sprintf("%s:%d", c.RemoteHost, c.RemotePort)
-	golog.Infof("connecting: %s", addr)
+	golog.Infof("Connecting %s", addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err

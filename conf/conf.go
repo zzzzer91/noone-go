@@ -15,6 +15,7 @@ type SSConf struct {
 var S *SSConf
 
 func LoadJson(path string) {
+	// TODO
 	S = &SSConf{
 		Server:     "0.0.0.0",
 		ServerPort: 9530,

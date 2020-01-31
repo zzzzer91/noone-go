@@ -26,7 +26,7 @@ func Run() {
 			golog.Error(err)
 			continue
 		}
-		golog.Debug("TCP accept: ", conn.RemoteAddr())
+		golog.Debug("TCP accept ", conn.RemoteAddr())
 		go handle(&pool, conn)
 	}
 }
