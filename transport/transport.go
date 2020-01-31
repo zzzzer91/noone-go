@@ -78,9 +78,6 @@ func (c *Ctx) readClient() error {
 	}
 	n, err := c.ClientConn.Read(c.clientBuf)
 	if err != nil {
-		if err.Error() == "EOF" {
-			return nil
-		}
 		return err
 	}
 	c.clientBufLen = n
@@ -110,9 +107,6 @@ func (c *Ctx) readRemote() error {
 	}
 	n, err := c.RemoteConn.Read(c.remoteBuf)
 	if err != nil {
-		if err.Error() == "EOF" {
-			return nil
-		}
 		return err
 	}
 	c.remoteBufLen = n
@@ -231,6 +225,10 @@ func (c *Ctx) HandleStream() error {
 			return err
 		}
 		if err := c.readClient(); err != nil {
+			// 对端关闭，忽略
+			if err.Error() == "EOF" {
+				return nil
+			}
 			return err
 		}
 	}
