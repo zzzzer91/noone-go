@@ -10,6 +10,7 @@ import (
 	"noone/conf"
 	"noone/crypto"
 	"noone/crypto/aes"
+	"sync"
 	"time"
 )
 
@@ -23,8 +24,8 @@ const (
 	StageInit      = iota // 获取 iv 阶段
 	StageHeader           // 解析 header 阶段，获取 remote 的 ip 和 port
 	StageHandShake        // TCP 和 remote 握手阶段
-	StageStream           // 传输阶段
-	StageDestroyed        // 该连接所有资源已销毁，就剩释放 Ctx 对象内存
+	StageStream           // TCP 传输阶段
+	StageDestroyed        // 该连接已销毁
 )
 
 // atyp
@@ -55,10 +56,7 @@ func New() *Ctx {
 	}
 }
 
-func (c *Ctx) Reset() {
-	c.Stage = StageInit
-	c.RemoteHost = nil
-	c.RemotePort = 0
+func (c *Ctx) closeAllConn() {
 	if c.ClientConn != nil {
 		_ = c.ClientConn.Close()
 		c.ClientConn = nil
@@ -67,9 +65,16 @@ func (c *Ctx) Reset() {
 		_ = c.RemoteConn.Close()
 		c.RemoteConn = nil
 	}
+}
+
+func (c *Ctx) Reset() {
+	c.Stage = StageInit
+	c.RemoteHost = nil
+	c.RemotePort = 0
 	c.cipher = nil
 	c.clientBufLen = 0
 	c.remoteBufLen = 0
+	c.closeAllConn()
 }
 
 func (c *Ctx) readClient() error {
@@ -208,32 +213,33 @@ func (c *Ctx) HandleStageHandShake() error {
 }
 
 func (c *Ctx) HandleStream() error {
-	errChan := make(chan error, 1)
-
-	go func(c *Ctx, errChan chan error) {
+	var lock sync.Mutex
+	go func(c *Ctx) {
 		for {
 			if err := c.readRemote(); err != nil {
-				errChan <- err
-				return
+				break
 			}
 			if err := c.writeClient(); err != nil {
-				errChan <- err
-				return
+				break
 			}
 		}
-	}(c, errChan)
+		lock.Lock()
+		c.closeAllConn()
+		lock.Unlock()
+	}(c)
 
 	for {
-		select {
-		case err := <-errChan:
-			return err
-		default:
-			if err := c.writeRemote(); err != nil {
-				return err
-			}
-			if err := c.readClient(); err != nil {
-				return err
-			}
+		if err := c.writeRemote(); err != nil {
+			break
+		}
+		if err := c.readClient(); err != nil {
+			break
 		}
 	}
+	lock.Lock()
+	c.closeAllConn()
+	lock.Unlock()
+	c.Stage = StageDestroyed
+	// 忽略 stream 阶段出现的错误，不是很重要
+	return nil
 }

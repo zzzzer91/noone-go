@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"github.com/kataras/golog"
+	"io"
 	"net"
 	"noone/transport"
 	"sync"
@@ -28,7 +29,7 @@ func handle(pool *sync.Pool, conn net.Conn) {
 	}
 	if err := c.HandleStream(); err != nil {
 		// 对端关闭，忽略
-		if err.Error() == "EOF" {
+		if err == io.EOF {
 			return
 		}
 		golog.Error(err)
