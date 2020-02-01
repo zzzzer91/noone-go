@@ -1,3 +1,3 @@
-# Noone-go
+# Noone
 
-Shadowsocks 服务端 go 实现。
+Shadowsocks 服务端 Go 实现。
