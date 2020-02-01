@@ -1,17 +1,14 @@
 package tcp
 
 import (
-	"fmt"
 	"github.com/kataras/golog"
 	"net"
-	"noone/conf"
 	"noone/transport"
 	"sync"
 )
 
-func Run() {
-	address := fmt.Sprintf("%s:%d", conf.S.Server, conf.S.ServerPort)
-	l, err := net.Listen("tcp", address)
+func Run(addr string) {
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		golog.Fatal(err)
 	}
