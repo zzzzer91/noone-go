@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-	// set log level
 	golog.SetLevel("debug")
 
 	golog.Info("Noone started!")

@@ -1,36 +1,12 @@
 package crypto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/md5"
 )
 
 type Cipher interface {
 	Encrypt(dst, src []byte)
 	Decrypt(dst, src []byte)
-}
-
-type ctx struct {
-	encryptCtx cipher.Stream
-	decryptCtx cipher.Stream
-}
-
-func New(key, iv []byte) *ctx {
-	encryptBlock, _ := aes.NewCipher(key)
-	decryptBlock, _ := aes.NewCipher(key)
-	return &ctx{
-		encryptCtx: cipher.NewCTR(encryptBlock, iv),
-		decryptCtx: cipher.NewCTR(decryptBlock, iv),
-	}
-}
-
-func (c *ctx) Encrypt(dst, src []byte) {
-	c.encryptCtx.XORKeyStream(dst, src)
-}
-
-func (c *ctx) Decrypt(dst, src []byte) {
-	c.decryptCtx.XORKeyStream(dst, src)
 }
 
 // key-derivation function from original Shadowsocks

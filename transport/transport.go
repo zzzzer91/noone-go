@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/kataras/golog"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"noone/conf"
 	"noone/crypto"
+	"noone/crypto/aes"
 	"time"
 )
 
@@ -130,17 +132,24 @@ func (c *Ctx) writeClient() error {
 }
 
 func (c *Ctx) HandleStageInit() error {
+	// 随机生成
+	encryptIV := make([]byte, 16)
 	iv := make([]byte, 16)
-	_, err := io.ReadFull(c.ClientConn, iv)
-	if err != nil {
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return err
 	}
-	c.cipher = crypto.New(crypto.Kdf(conf.S.Password, 16), iv)
-	err = c.readClient()
-	if err != nil {
+
+	decryptIV := make([]byte, 16)
+	if _, err := io.ReadFull(c.ClientConn, decryptIV); err != nil {
 		return err
 	}
-	c.iv = iv
+
+	c.cipher = aes.NewCtr(crypto.Kdf(conf.S.Password, 16), encryptIV, decryptIV)
+
+	if err := c.readClient(); err != nil {
+		return err
+	}
+	c.iv = encryptIV
 	c.Stage = StageHeader
 	return nil
 }
@@ -200,10 +209,6 @@ func (c *Ctx) sendIv(iv []byte) error {
 
 func (c *Ctx) HandleStream() error {
 	go func(c *Ctx) {
-		//iv := make([]byte, 16)
-		//if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		//	return
-		//}
 		if err := c.sendIv(c.iv); err != nil {
 			return
 		}
