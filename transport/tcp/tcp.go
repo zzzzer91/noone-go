@@ -3,19 +3,13 @@ package tcp
 import (
 	"github.com/kataras/golog"
 	"net"
-	"noone/transport"
 	"sync"
 )
 
-func Run(addr string) {
+func Run(pool *sync.Pool, addr string) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		golog.Fatal(err)
-	}
-	pool := sync.Pool{
-		New: func() interface{} {
-			return transport.New()
-		},
 	}
 	for {
 		conn, err := l.Accept()
@@ -24,6 +18,6 @@ func Run(addr string) {
 			continue
 		}
 		golog.Debug("TCP accept ", conn.RemoteAddr())
-		go handle(&pool, conn)
+		go handle(pool, conn)
 	}
 }

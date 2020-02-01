@@ -10,6 +10,7 @@ import (
 
 func handle(pool *sync.Pool, conn net.Conn) {
 	c := pool.Get().(*transport.Ctx)
+	c.Network = "tcp"
 	c.ClientConn = conn
 
 	defer pool.Put(c)

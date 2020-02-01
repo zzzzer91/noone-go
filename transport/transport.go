@@ -36,6 +36,7 @@ const (
 )
 
 type Ctx struct {
+	Network      string
 	Stage        int
 	RemoteHost   []byte
 	RemotePort   int
@@ -68,6 +69,7 @@ func (c *Ctx) closeAllConn() {
 }
 
 func (c *Ctx) Reset() {
+	c.Network = ""
 	c.Stage = StageInit
 	c.RemoteHost = nil
 	c.RemotePort = 0
