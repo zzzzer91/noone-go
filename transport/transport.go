@@ -148,7 +148,7 @@ func (c *Ctx) HandleStageInit() error {
 		return err
 	}
 
-	// 随机生成
+	// 随机生成 IV，然后发送给客户端
 	encryptIV := make([]byte, 16)
 	if _, err := io.ReadFull(rand.Reader, encryptIV); err != nil {
 		return err
