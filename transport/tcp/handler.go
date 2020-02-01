@@ -27,6 +27,10 @@ func handle(pool *sync.Pool, conn net.Conn) {
 		return
 	}
 	if err := c.HandleStream(); err != nil {
+		// 对端关闭，忽略
+		if err.Error() == "EOF" {
+			return
+		}
 		golog.Error(err)
 		return
 	}

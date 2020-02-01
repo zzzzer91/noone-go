@@ -41,7 +41,6 @@ type Ctx struct {
 	ClientConn   net.Conn
 	RemoteConn   net.Conn
 	cipher       crypto.Cipher
-	iv           []byte
 	clientBuf    []byte
 	clientBufLen int
 	remoteBuf    []byte
@@ -111,6 +110,7 @@ func (c *Ctx) readRemote() error {
 	if err != nil {
 		return err
 	}
+	c.cipher.Encrypt(c.remoteBuf, c.remoteBuf[:n])
 	c.remoteBufLen = n
 	return nil
 }
@@ -121,7 +121,6 @@ func (c *Ctx) writeClient() error {
 		if err != nil {
 			return err
 		}
-		c.cipher.Encrypt(c.remoteBuf, c.remoteBuf[:c.remoteBufLen])
 		n, err := c.ClientConn.Write(c.remoteBuf[:c.remoteBufLen])
 		if err != nil {
 			return err
@@ -131,16 +130,30 @@ func (c *Ctx) writeClient() error {
 	return nil
 }
 
+func (c *Ctx) sendIv(iv []byte) error {
+	err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
+	if err != nil {
+		return err
+	}
+	_, err = c.ClientConn.Write(iv)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Ctx) HandleStageInit() error {
-	// 随机生成
-	encryptIV := make([]byte, 16)
-	iv := make([]byte, 16)
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+	decryptIV := make([]byte, 16)
+	if _, err := io.ReadFull(c.ClientConn, decryptIV); err != nil {
 		return err
 	}
 
-	decryptIV := make([]byte, 16)
-	if _, err := io.ReadFull(c.ClientConn, decryptIV); err != nil {
+	// 随机生成
+	encryptIV := make([]byte, 16)
+	if _, err := io.ReadFull(rand.Reader, encryptIV); err != nil {
+		return err
+	}
+	if err := c.sendIv(encryptIV); err != nil {
 		return err
 	}
 
@@ -149,7 +162,6 @@ func (c *Ctx) HandleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
-	c.iv = encryptIV
 	c.Stage = StageHeader
 	return nil
 }
@@ -195,43 +207,33 @@ func (c *Ctx) HandleStageHandShake() error {
 	return nil
 }
 
-func (c *Ctx) sendIv(iv []byte) error {
-	err := c.ClientConn.SetWriteDeadline(time.Now().Add(time.Minute * 2))
-	if err != nil {
-		return err
-	}
-	_, err = c.ClientConn.Write(iv)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (c *Ctx) HandleStream() error {
-	go func(c *Ctx) {
-		if err := c.sendIv(c.iv); err != nil {
-			return
-		}
+	errChan := make(chan error, 1)
+
+	go func(c *Ctx, errChan chan error) {
 		for {
 			if err := c.readRemote(); err != nil {
+				errChan <- err
 				return
 			}
 			if err := c.writeClient(); err != nil {
+				errChan <- err
 				return
 			}
 		}
-	}(c)
+	}(c, errChan)
 
 	for {
-		if err := c.writeRemote(); err != nil {
+		select {
+		case err := <-errChan:
 			return err
-		}
-		if err := c.readClient(); err != nil {
-			// 对端关闭，忽略
-			if err.Error() == "EOF" {
-				return nil
+		default:
+			if err := c.writeRemote(); err != nil {
+				return err
 			}
-			return err
+			if err := c.readClient(); err != nil {
+				return err
+			}
 		}
 	}
 }
