@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	ClientBufCapacity = 8 * 1024
+	// client 发送过来的数据一般比较短
+	ClientBufCapacity = 2 * 1024
 	RemoteBufCapacity = 8 * 1024
 )
 
