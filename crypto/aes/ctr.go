@@ -5,24 +5,32 @@ import (
 	"crypto/cipher"
 )
 
-type Ctr struct {
-	encryptCtx cipher.Stream
-	decryptCtx cipher.Stream
+type CtrEncryptCtx struct {
+	x cipher.Stream
 }
 
-func NewCtr(key, encryptIV, decryptIV []byte) *Ctr {
+func NewCtrEncrypter(key, iv []byte) *CtrEncryptCtx {
 	encryptBlock, _ := aes.NewCipher(key)
-	decryptBlock, _ := aes.NewCipher(key)
-	return &Ctr{
-		encryptCtx: cipher.NewCTR(encryptBlock, encryptIV),
-		decryptCtx: cipher.NewCTR(decryptBlock, decryptIV),
+	return &CtrEncryptCtx{
+		x: cipher.NewCTR(encryptBlock, iv),
 	}
 }
 
-func (c *Ctr) Encrypt(dst, src []byte) {
-	c.encryptCtx.XORKeyStream(dst, src)
+func (c *CtrEncryptCtx) Encrypt(dst, src []byte) {
+	c.x.XORKeyStream(dst, src)
 }
 
-func (c *Ctr) Decrypt(dst, src []byte) {
-	c.decryptCtx.XORKeyStream(dst, src)
+type CtrDecryptCtx struct {
+	x cipher.Stream
+}
+
+func NewCtrDecrypter(key, iv []byte) *CtrDecryptCtx {
+	decryptBlock, _ := aes.NewCipher(key)
+	return &CtrDecryptCtx{
+		x: cipher.NewCTR(decryptBlock, iv),
+	}
+}
+
+func (c *CtrDecryptCtx) Decrypt(dst, src []byte) {
+	c.x.XORKeyStream(dst, src)
 }

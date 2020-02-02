@@ -6,10 +6,15 @@ import (
 	"sync"
 )
 
-func Run(pool *sync.Pool, addr string) {
+func Run(addr string) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		golog.Fatal(err)
+	}
+	pool := &sync.Pool{
+		New: func() interface{} {
+			return newCtx()
+		},
 	}
 	for {
 		conn, err := l.Accept()

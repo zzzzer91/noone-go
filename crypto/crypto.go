@@ -4,8 +4,11 @@ import (
 	"crypto/md5"
 )
 
-type Cipher interface {
+type Encrypter interface {
 	Encrypt(dst, src []byte)
+}
+
+type Decrypter interface {
 	Decrypt(dst, src []byte)
 }
 
