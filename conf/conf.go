@@ -14,7 +14,7 @@ type SSConf struct {
 
 var S *SSConf
 
-func LoadJson(path string) {
+func LoadJson(path string) error {
 	// TODO
 	S = &SSConf{
 		Server:     "0.0.0.0",
@@ -24,4 +24,5 @@ func LoadJson(path string) {
 		Method:     "aes-128-ctr",
 		FastOpen:   true,
 	}
+	return nil
 }

@@ -7,12 +7,6 @@ import (
 )
 
 const (
-	// client 发送过来的数据一般比较短
-	ClientBufCapacity = 2 * 1024
-	RemoteBufCapacity = 8 * 1024
-)
-
-const (
 	StageInit      = iota // 解析 header 阶段，获取 iv, remote 的 ip 和 port
 	StageHandShake        // TCP 和 remote 握手阶段
 	StageStream           // TCP 传输阶段

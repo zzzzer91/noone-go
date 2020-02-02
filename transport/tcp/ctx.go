@@ -12,6 +12,12 @@ import (
 	"noone/transport"
 )
 
+const (
+	// client 发送过来的数据一般比较短
+	clientBufCapacity = 2 * 1024
+	remoteBufCapacity = 8 * 1024
+)
+
 type ctx struct {
 	Stage        int
 	Addr         string
@@ -28,8 +34,8 @@ type ctx struct {
 func newCtx() *ctx {
 	return &ctx{
 		Stage:     transport.StageInit,
-		clientBuf: make([]byte, transport.ClientBufCapacity),
-		remoteBuf: make([]byte, transport.RemoteBufCapacity),
+		clientBuf: make([]byte, clientBufCapacity),
+		remoteBuf: make([]byte, remoteBufCapacity),
 	}
 }
 

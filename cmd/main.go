@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/kataras/golog"
 	"noone/conf"
@@ -11,11 +12,20 @@ import (
 )
 
 func main() {
-	golog.SetLevel("debug")
+	var flags struct {
+		confPath string
+		logLevel string
+	}
+	flag.StringVar(&flags.confPath, "c", "conf.json", "config file path")
+	flag.StringVar(&flags.logLevel, "loglevel", "debug", "log level")
+	flag.Parse()
+
+	if err := conf.LoadJson(flags.confPath); err != nil {
+		golog.Fatal(err)
+	}
+	golog.SetLevel(flags.logLevel)
 
 	golog.Info("Noone started!")
-
-	conf.LoadJson("/etc/shadowsocks.json")
 
 	addr := fmt.Sprintf("%s:%d", conf.S.Server, conf.S.ServerPort)
 	go tcp.Run(addr)
