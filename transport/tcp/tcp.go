@@ -7,7 +7,11 @@ import (
 )
 
 func Run(addr string) {
-	l, err := net.Listen("tcp", addr)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		golog.Fatal(err)
+	}
+	l, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		golog.Fatal(err)
 	}
@@ -17,7 +21,7 @@ func Run(addr string) {
 		},
 	}
 	for {
-		conn, err := l.Accept()
+		conn, err := l.AcceptTCP()
 		if err != nil {
 			golog.Error(err)
 			continue

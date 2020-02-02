@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	StreamTimeout = 2 * time.Minute
+	StreamTimeout = 1 * time.Minute
 )
 
 type ctx struct {
@@ -22,8 +22,8 @@ type ctx struct {
 	Addr         string
 	Encrypter    crypto.Encrypter
 	Decrypter    crypto.Decrypter
-	clientConn   net.Conn
-	remoteConn   net.Conn
+	clientConn   *net.TCPConn
+	remoteConn   *net.TCPConn
 	clientBuf    []byte
 	clientBufLen int
 	remoteBuf    []byte
@@ -56,10 +56,6 @@ func (c *ctx) reset() {
 }
 
 func (c *ctx) readClient() error {
-	err := c.clientConn.SetReadDeadline(time.Now().Add(StreamTimeout))
-	if err != nil {
-		return err
-	}
 	n, err := c.clientConn.Read(c.clientBuf)
 	if err != nil {
 		return err
@@ -84,10 +80,6 @@ func (c *ctx) readClient() error {
 
 func (c *ctx) writeRemote() error {
 	if c.clientBufLen > 0 {
-		err := c.remoteConn.SetWriteDeadline(time.Now().Add(StreamTimeout))
-		if err != nil {
-			return err
-		}
 		n, err := c.remoteConn.Write(c.clientBuf[:c.clientBufLen])
 		if err != nil {
 			return err
@@ -98,10 +90,6 @@ func (c *ctx) writeRemote() error {
 }
 
 func (c *ctx) readRemote() error {
-	err := c.remoteConn.SetReadDeadline(time.Now().Add(StreamTimeout))
-	if err != nil {
-		return err
-	}
 	offset := 0
 	if c.Encrypter == nil {
 		// 随机生成 IV，然后发送给客户端
@@ -123,10 +111,6 @@ func (c *ctx) readRemote() error {
 
 func (c *ctx) writeClient() error {
 	if c.remoteBufLen > 0 {
-		err := c.clientConn.SetWriteDeadline(time.Now().Add(StreamTimeout))
-		if err != nil {
-			return err
-		}
 		n, err := c.clientConn.Write(c.remoteBuf[:c.remoteBufLen])
 		if err != nil {
 			return err
@@ -159,7 +143,7 @@ func (c *ctx) handleStageHandShake() error {
 	if err != nil {
 		return err
 	}
-	c.remoteConn = conn
+	c.remoteConn = conn.(*net.TCPConn)
 	c.Stage = transport.StageStream
 	return nil
 }

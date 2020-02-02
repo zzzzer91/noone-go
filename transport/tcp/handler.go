@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-func handle(pool *sync.Pool, conn net.Conn) {
+func handle(pool *sync.Pool, conn *net.TCPConn) {
 	c := pool.Get().(*ctx)
 	c.clientConn = conn
 
