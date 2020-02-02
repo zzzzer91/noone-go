@@ -10,11 +10,6 @@ import (
 	"noone/crypto"
 	"noone/crypto/aes"
 	"noone/transport"
-	"time"
-)
-
-const (
-	StreamTimeout = 1 * time.Minute
 )
 
 type ctx struct {
@@ -141,9 +136,14 @@ func (c *ctx) handleStageHandShake() error {
 	golog.Info("Connecting " + c.Addr)
 	conn, err := net.Dial("tcp", c.Addr)
 	if err != nil {
-		return err
+		return errors.New("Connect " + c.Addr + " error: " + err.Error())
 	}
 	c.remoteConn = conn.(*net.TCPConn)
+	err = c.remoteConn.SetKeepAlive(true)
+	if err != nil {
+		return err
+	}
+	golog.Info("Connected " + c.Addr)
 	c.Stage = transport.StageStream
 	return nil
 }

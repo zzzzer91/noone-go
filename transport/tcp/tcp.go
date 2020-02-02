@@ -26,6 +26,11 @@ func Run(addr string) {
 			golog.Error(err)
 			continue
 		}
+		err = conn.SetKeepAlive(true)
+		if err != nil {
+			golog.Error(err)
+			continue
+		}
 		golog.Debug("TCP accept ", conn.RemoteAddr())
 		go handle(pool, conn)
 	}
