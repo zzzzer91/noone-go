@@ -37,6 +37,10 @@ func ParseHeader(buf []byte) (string, int, error) {
 	switch atyp {
 	case AtypDomain:
 		hostLen = int(buf[offset])
+		// 域名长度允许范围
+		if hostLen < 4 || hostLen > 2000 {
+			return "", 0, errors.New("域名长度不合法")
+		}
 		offset += 1
 	case AtypIpv4:
 		hostLen = net.IPv4len
@@ -45,6 +49,7 @@ func ParseHeader(buf []byte) (string, int, error) {
 	default:
 		return "", 0, errors.New("atyp不合法")
 	}
+	// hostLen 长度要检查，不然会被爆内存
 	host := make([]byte, hostLen)
 	copy(host, buf[offset:])
 	offset += hostLen
