@@ -10,7 +10,6 @@ import (
 	"noone/crypto"
 	"noone/crypto/aes"
 	"noone/transport"
-	"sync"
 	"time"
 )
 
@@ -39,7 +38,13 @@ func newCtx() *ctx {
 	}
 }
 
-func (c *ctx) closeAllConn() {
+func (c *ctx) reset() {
+	c.Stage = transport.StageInit
+	c.Addr = ""
+	c.Encrypter = nil
+	c.Decrypter = nil
+	c.clientBufLen = 0
+	c.remoteBufLen = 0
 	if c.clientConn != nil {
 		_ = c.clientConn.Close()
 		c.clientConn = nil
@@ -48,16 +53,6 @@ func (c *ctx) closeAllConn() {
 		_ = c.remoteConn.Close()
 		c.remoteConn = nil
 	}
-}
-
-func (c *ctx) reset() {
-	c.Stage = transport.StageInit
-	c.Addr = ""
-	c.Encrypter = nil
-	c.Decrypter = nil
-	c.clientBufLen = 0
-	c.remoteBufLen = 0
-	c.closeAllConn()
 }
 
 func (c *ctx) readClient() error {
@@ -170,8 +165,8 @@ func (c *ctx) handleStageHandShake() error {
 }
 
 func (c *ctx) handleStream() error {
-	var lock sync.Mutex
-	go func(c *ctx) {
+	done := make(chan bool, 1)
+	go func(c *ctx, done chan bool) {
 		for {
 			if err := c.readRemote(); err != nil {
 				break
@@ -180,10 +175,10 @@ func (c *ctx) handleStream() error {
 				break
 			}
 		}
-		lock.Lock()
-		c.closeAllConn()
-		lock.Unlock()
-	}(c)
+		_ = c.clientConn.Close()
+		_ = c.remoteConn.Close()
+		done <- true
+	}(c, done)
 
 	for {
 		if err := c.writeRemote(); err != nil {
@@ -193,9 +188,9 @@ func (c *ctx) handleStream() error {
 			break
 		}
 	}
-	lock.Lock()
-	c.closeAllConn()
-	lock.Unlock()
+	_ = c.clientConn.Close()
+	_ = c.remoteConn.Close()
+	<-done
 	c.Stage = transport.StageDestroyed
 	// 忽略 stream 阶段出现的错误，不是很重要
 	return nil
