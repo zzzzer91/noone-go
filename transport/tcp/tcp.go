@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"github.com/kataras/golog"
+	"io"
 	"net"
 	"sync"
 )
@@ -31,7 +32,32 @@ func Run(addr string) {
 			golog.Error(err)
 			continue
 		}
-		golog.Debug("TCP accept ", conn.RemoteAddr())
 		go handle(pool, conn)
+	}
+}
+
+func handle(pool *sync.Pool, conn *net.TCPConn) {
+	c := pool.Get().(*ctx)
+	c.ClientAddr = conn.RemoteAddr().String()
+	c.clientConn = conn
+	defer pool.Put(c)
+	defer c.reset()
+
+	golog.Debug("TCP accept ", c.ClientAddr)
+	if err := c.handleStageInit(); err != nil {
+		golog.Error(err)
+		return
+	}
+	if err := c.handleStageHandShake(); err != nil {
+		golog.Error(err)
+		return
+	}
+	if err := c.handleStream(); err != nil {
+		// 对端关闭，忽略
+		if err == io.EOF {
+			return
+		}
+		golog.Error(err)
+		return
 	}
 }

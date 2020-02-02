@@ -12,17 +12,8 @@ import (
 	"noone/transport"
 )
 
-const (
-	// client 发送过来的数据一般比较短
-	clientBufCapacity = 2 * 1024
-	remoteBufCapacity = 8 * 1024
-)
-
 type ctx struct {
-	Stage        int
-	Addr         string
-	Encrypter    crypto.Encrypter
-	Decrypter    crypto.Decrypter
+	transport.Ctx
 	clientConn   *net.TCPConn
 	remoteConn   *net.TCPConn
 	clientBuf    []byte
@@ -33,17 +24,14 @@ type ctx struct {
 
 func newCtx() *ctx {
 	return &ctx{
-		Stage:     transport.StageInit,
+		Ctx:       transport.NewCtx(),
 		clientBuf: make([]byte, clientBufCapacity),
 		remoteBuf: make([]byte, remoteBufCapacity),
 	}
 }
 
 func (c *ctx) reset() {
-	c.Stage = transport.StageInit
-	c.Addr = ""
-	c.Encrypter = nil
-	c.Decrypter = nil
+	c.Ctx.Reset()
 	c.clientBufLen = 0
 	c.remoteBufLen = 0
 	if c.clientConn != nil {
@@ -129,7 +117,7 @@ func (c *ctx) handleStageInit() error {
 	if err != nil {
 		return err
 	}
-	c.Addr = addr
+	c.RemoteAddr = addr
 	// src 和 dst 可以重叠
 	copy(c.clientBuf, c.clientBuf[offset:c.clientBufLen])
 	c.clientBufLen -= offset
@@ -139,17 +127,17 @@ func (c *ctx) handleStageInit() error {
 }
 
 func (c *ctx) handleStageHandShake() error {
-	golog.Info("Connecting " + c.Addr)
-	conn, err := net.Dial("tcp", c.Addr)
+	golog.Info("Connecting " + c.RemoteAddr)
+	conn, err := net.Dial("tcp", c.RemoteAddr)
 	if err != nil {
-		return errors.New("Connect " + c.Addr + " error: " + err.Error())
+		return errors.New("Connect " + c.RemoteAddr + " error: " + err.Error())
 	}
 	c.remoteConn = conn.(*net.TCPConn)
 	err = c.remoteConn.SetKeepAlive(true)
 	if err != nil {
 		return err
 	}
-	golog.Info("Connected " + c.Addr)
+	golog.Info("Connected " + c.RemoteAddr)
 	c.Stage = transport.StageStream
 	return nil
 }
