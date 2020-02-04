@@ -3,6 +3,7 @@ package transport
 import "noone/crypto"
 
 type Ctx struct {
+	Network    string
 	Stage      int
 	ClientAddr string
 	RemoteAddr string
@@ -10,13 +11,15 @@ type Ctx struct {
 	Decrypter  crypto.Decrypter
 }
 
-func NewCtx() Ctx {
+func NewCtx(network string) Ctx {
 	return Ctx{
-		Stage: StageInit,
+		Network: network,
+		Stage:   StageInit,
 	}
 }
 
 func (c *Ctx) Reset() {
+	c.Network = ""
 	c.Stage = StageInit
 	c.ClientAddr = ""
 	c.RemoteAddr = ""

@@ -24,7 +24,7 @@ type ctx struct {
 
 func newCtx() *ctx {
 	return &ctx{
-		Ctx:       transport.NewCtx(),
+		Ctx:       transport.NewCtx("tcp"),
 		clientBuf: make([]byte, clientBufCapacity),
 		remoteBuf: make([]byte, remoteBufCapacity),
 	}

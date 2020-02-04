@@ -43,7 +43,7 @@ func handle(pool *sync.Pool, conn *net.TCPConn) {
 	defer pool.Put(c)
 	defer c.reset()
 
-	golog.Debug("TCP accept ", c.ClientAddr)
+	golog.Debug("TCP accept " + c.ClientAddr)
 	if err := c.handleStageInit(); err != nil {
 		golog.Error(err)
 		return
