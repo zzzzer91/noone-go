@@ -128,11 +128,15 @@ func (c *ctx) handleStageInit() error {
 
 func (c *ctx) handleStageHandShake() error {
 	golog.Info("Connecting " + c.RemoteAddr)
-	conn, err := net.Dial("tcp", c.RemoteAddr)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", c.RemoteAddr)
+	if err != nil {
+		return err
+	}
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	if err != nil {
 		return errors.New("Connect " + c.RemoteAddr + " error: " + err.Error())
 	}
-	c.remoteConn = conn.(*net.TCPConn)
+	c.remoteConn = conn
 	err = c.remoteConn.SetKeepAlive(true)
 	if err != nil {
 		return err
