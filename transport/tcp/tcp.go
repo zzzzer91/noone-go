@@ -38,12 +38,12 @@ func Run(addr string) {
 
 func handle(pool *sync.Pool, conn *net.TCPConn) {
 	c := pool.Get().(*ctx)
-	c.ClientAddr = conn.RemoteAddr().String()
+	c.ClientAddr = conn.RemoteAddr()
 	c.clientConn = conn
 	defer pool.Put(c)
 	defer c.reset()
 
-	golog.Debug("TCP accept " + c.ClientAddr)
+	golog.Debug("TCP accept " + c.ClientAddr.String())
 	if err := c.handleStageInit(); err != nil {
 		golog.Error(err)
 		return

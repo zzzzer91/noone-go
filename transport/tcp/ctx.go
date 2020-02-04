@@ -8,6 +8,7 @@ import (
 	"noone/crypto"
 	"noone/crypto/aes"
 	"noone/transport"
+	"strconv"
 )
 
 type ctx struct {
@@ -111,11 +112,17 @@ func (c *ctx) handleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
-	addr, offset, err := transport.ParseHeader(c.clientBuf)
+	domain, ip, port, offset, err := transport.ParseHeader(c.clientBuf)
 	if err != nil {
 		return err
 	}
-	c.RemoteAddr = addr
+	c.RemoteDomain = domain
+	c.RemotePort = port
+	c.RemoteAddr = &net.TCPAddr{
+		IP:   ip,
+		Port: port,
+		Zone: "",
+	}
 	// src 和 dst 可以重叠
 	copy(c.clientBuf, c.clientBuf[offset:c.clientBufLen])
 	c.clientBufLen -= offset
@@ -125,21 +132,23 @@ func (c *ctx) handleStageInit() error {
 }
 
 func (c *ctx) handleStageHandShake() error {
-	golog.Info("Connecting " + c.RemoteAddr)
-	tcpAddr, err := net.ResolveTCPAddr("tcp", c.RemoteAddr)
-	if err != nil {
-		return err
+	var temp string
+	if c.RemoteDomain != "" { // 优先打印域名
+		temp = c.RemoteDomain + ":" + strconv.Itoa(c.RemotePort)
+	} else {
+		temp = c.RemoteAddr.String()
 	}
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	golog.Info("Connecting " + temp)
+	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
 	if err != nil {
-		return errors.New("Connect " + c.RemoteAddr + " error: " + err.Error())
+		return errors.New("Connect " + temp + " error: " + err.Error())
 	}
 	c.remoteConn = conn
 	err = c.remoteConn.SetKeepAlive(true)
 	if err != nil {
 		return err
 	}
-	golog.Info("Connected " + c.RemoteAddr)
+	golog.Info("Connected " + temp)
 	c.Stage = transport.StageStream
 	return nil
 }

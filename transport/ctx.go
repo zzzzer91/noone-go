@@ -1,14 +1,19 @@
 package transport
 
-import "noone/crypto"
+import (
+	"net"
+	"noone/crypto"
+)
 
 type Ctx struct {
-	Network    string
-	Stage      int
-	ClientAddr string
-	RemoteAddr string
-	Encrypter  crypto.Encrypter
-	Decrypter  crypto.Decrypter
+	Network      string
+	Stage        int
+	RemoteDomain string
+	RemotePort   int
+	ClientAddr   net.Addr
+	RemoteAddr   net.Addr
+	Encrypter    crypto.Encrypter
+	Decrypter    crypto.Decrypter
 }
 
 func NewCtx(network string) Ctx {
@@ -21,8 +26,10 @@ func NewCtx(network string) Ctx {
 func (c *Ctx) Reset() {
 	c.Network = ""
 	c.Stage = StageInit
-	c.ClientAddr = ""
-	c.RemoteAddr = ""
+	c.RemoteDomain = ""
+	c.RemotePort = 0
+	c.ClientAddr = nil
+	c.RemoteAddr = nil
 	c.Encrypter = nil
 	c.Decrypter = nil
 }
