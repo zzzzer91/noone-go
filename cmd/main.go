@@ -6,6 +6,7 @@ import (
 	"github.com/kataras/golog"
 	"noone/conf"
 	"noone/transport/tcp"
+	"noone/transport/udp"
 	"os"
 	"os/signal"
 	"syscall"
@@ -29,7 +30,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", conf.S.Server, conf.S.ServerPort)
 	go tcp.Run(addr)
-	// go udp.Run(addr)
+	go udp.Run(addr)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
