@@ -1,10 +1,8 @@
 package tcp
 
 import (
-	"crypto/rand"
 	"errors"
 	"github.com/kataras/golog"
-	"io"
 	"net"
 	"noone/conf"
 	"noone/crypto"
@@ -82,7 +80,7 @@ func (c *ctx) readRemote() error {
 	offset := 0
 	if c.Encrypter == nil {
 		// 随机生成 IV，然后发送给客户端
-		if _, err := io.ReadFull(rand.Reader, c.remoteBuf[:aes.IvLen]); err != nil {
+		if err := aes.GenRandomIv(c.remoteBuf[:aes.IvLen]); err != nil {
 			return err
 		}
 		c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.S.Password, aes.IvLen), c.remoteBuf[:aes.IvLen])
