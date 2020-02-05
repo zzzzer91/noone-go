@@ -6,15 +6,12 @@ import (
 )
 
 type SSConf struct {
-	Server       string
-	ServerPort   uint16
-	LocalAddress string
-	LocalPort    uint16
-	Password     string
-	Timeout      int
-	Method       string
-	PortPassword map[string]string
-	FastOpen     bool
+	Server       string            `json:"server"`
+	ServerPort   uint16            `json:"server_port"`
+	Password     string            `json:"password"`
+	Timeout      int               `json:"timeout"`
+	Method       string            `json:"method"`
+	PortPassword map[string]string `json:"port_password"`
 }
 
 var SS *SSConf
