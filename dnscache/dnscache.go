@@ -23,24 +23,25 @@ type dnsCache struct {
 	lock  sync.RWMutex
 }
 
-func (l *dnsCache) set(key string, val *entry) {
+func (l *dnsCache) set(key string, ips []net.IP) {
 	l.lock.Lock()
-	l.cache[key] = val
+	l.cache[key] = &entry{
+		ips:     ips,
+		refresh: false, // 设为 false，接下来一段时间不用，就会被清理
+	}
 	l.lock.Unlock()
 }
 
-func (l *dnsCache) get(key string) *entry {
+func (l *dnsCache) get(key string) []net.IP {
 	l.lock.RLock()
+	defer l.lock.RUnlock()
 	v, ok := l.cache[key]
-	l.lock.RUnlock()
 	if !ok {
 		return nil
 	}
-	// 这里感觉不加锁没问题？
-	if !v.refresh {
-		v.refresh = true
-	}
-	return v
+	// 这里感觉不加写锁没问题？
+	v.refresh = true
+	return v.ips
 }
 
 func (l *dnsCache) del(key string) {
@@ -77,15 +78,12 @@ func init() {
 
 func LookupIP(host string) ([]net.IP, error) {
 	if v := defaultDnsCache.get(host); v != nil {
-		return v.ips, nil
+		return v, nil
 	}
 	ips, err := net.LookupIP(host)
 	if err != nil {
 		return nil, err
 	}
-	defaultDnsCache.set(host, &entry{
-		ips:     ips,
-		refresh: false, // 设为 false，接下来一段时间不用，就会被清理
-	})
+	defaultDnsCache.set(host, ips)
 	return ips, nil
 }
