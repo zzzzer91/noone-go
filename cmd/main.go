@@ -17,8 +17,8 @@ func main() {
 		confPath string
 		logLevel string
 	}
-	flag.StringVar(&flags.confPath, "c", "conf.json", "config file path")
-	flag.StringVar(&flags.logLevel, "loglevel", "debug", "log level")
+	flag.StringVar(&flags.confPath, "c", "config.json", "config file path")
+	flag.StringVar(&flags.logLevel, "loglevel", "info", "log level")
 	flag.Parse()
 
 	if err := conf.LoadJson(flags.confPath); err != nil {
@@ -28,7 +28,7 @@ func main() {
 
 	golog.Info("Noone started!")
 
-	addr := fmt.Sprintf("%s:%d", conf.S.Server, conf.S.ServerPort)
+	addr := fmt.Sprintf("%s:%d", conf.SS.Server, conf.SS.ServerPort)
 	go tcp.Run(addr)
 	go udp.Run(addr)
 

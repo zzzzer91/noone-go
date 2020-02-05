@@ -53,7 +53,7 @@ func (c *ctx) readClient() error {
 		if n < aes.IvLen {
 			return errors.New("IV长度不合法")
 		}
-		c.Decrypter = aes.NewCtrDecrypter(crypto.Kdf(conf.S.Password, aes.IvLen), c.clientBuf[:aes.IvLen])
+		c.Decrypter = aes.NewCtrDecrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), c.clientBuf[:aes.IvLen])
 		c.clientBufLen -= aes.IvLen
 		if c.clientBufLen == 0 {
 			return nil
@@ -84,7 +84,7 @@ func (c *ctx) readRemote() error {
 		if err := aes.GenRandomIv(c.remoteBuf[:aes.IvLen]); err != nil {
 			return err
 		}
-		c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.S.Password, aes.IvLen), c.remoteBuf[:aes.IvLen])
+		c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), c.remoteBuf[:aes.IvLen])
 		offset = aes.IvLen
 	}
 	n, err := c.remoteConn.Read(c.remoteBuf[offset:])

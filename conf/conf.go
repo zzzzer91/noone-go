@@ -1,5 +1,10 @@
 package conf
 
+import (
+	"encoding/json"
+	"io/ioutil"
+)
+
 type SSConf struct {
 	Server       string
 	ServerPort   uint16
@@ -12,17 +17,18 @@ type SSConf struct {
 	FastOpen     bool
 }
 
-var S *SSConf
+var SS *SSConf
 
 func LoadJson(path string) error {
-	// TODO
-	S = &SSConf{
-		Server:     "0.0.0.0",
-		ServerPort: 9530,
-		Password:   "123456",
-		Timeout:    300,
-		Method:     "aes-128-ctr",
-		FastOpen:   true,
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
 	}
+	var conf SSConf
+	err = json.Unmarshal(b, &conf)
+	if err != nil {
+		return err
+	}
+	SS = &conf
 	return nil
 }

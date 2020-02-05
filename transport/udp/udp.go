@@ -34,7 +34,7 @@ func Run(addr string) {
 		c.ClientAddr = clientAddr
 		golog.Info("UDP readfrom " + c.ClientAddr.String())
 
-		c.Decrypter = aes.NewCtrDecrypter(crypto.Kdf(conf.S.Password, aes.IvLen), clientBuf[:aes.IvLen])
+		c.Decrypter = aes.NewCtrDecrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), clientBuf[:aes.IvLen])
 		copy(clientBuf, clientBuf[aes.IvLen:clientReadN])
 		clientReadN -= aes.IvLen
 		c.Decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
@@ -84,7 +84,7 @@ func Run(addr string) {
 				return
 			}
 			n += aes.IvLen + offset
-			c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.S.Password, aes.IvLen), remoteBuf[:aes.IvLen])
+			c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), remoteBuf[:aes.IvLen])
 			c.Encrypter.Encrypt(remoteBuf[aes.IvLen:n], remoteBuf[aes.IvLen:n])
 			_, err = c.lClient.WriteTo(remoteBuf[:n], c.ClientAddr.(*net.UDPAddr))
 			if err != nil {
