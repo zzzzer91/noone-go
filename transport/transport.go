@@ -3,6 +3,7 @@ package transport
 import (
 	"errors"
 	"net"
+	"noone/dnscache"
 )
 
 func ParseHeader(buf []byte) (string, net.IP, int, int, error) {
@@ -29,7 +30,7 @@ func ParseHeader(buf []byte) (string, net.IP, int, int, error) {
 		offset += domainLen
 		// 解析IP
 		domain = string(domainBytes)
-		ips, err := net.LookupIP(domain)
+		ips, err := dnscache.LookupIP(domain)
 		if err != nil {
 			return "", nil, 0, 0, err
 		}
