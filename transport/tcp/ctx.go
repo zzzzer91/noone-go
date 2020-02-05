@@ -23,7 +23,7 @@ type ctx struct {
 
 func newCtx() *ctx {
 	return &ctx{
-		Ctx:       transport.NewCtx("tcp"),
+		Ctx:       transport.NewCtx(),
 		clientBuf: make([]byte, clientBufCapacity),
 		remoteBuf: make([]byte, remoteBufCapacity),
 	}

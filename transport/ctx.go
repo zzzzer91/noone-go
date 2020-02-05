@@ -6,7 +6,6 @@ import (
 )
 
 type Ctx struct {
-	Network      string
 	Stage        int
 	RemoteDomain string
 	RemotePort   int
@@ -16,15 +15,13 @@ type Ctx struct {
 	Decrypter    crypto.Decrypter
 }
 
-func NewCtx(network string) Ctx {
+func NewCtx() Ctx {
 	return Ctx{
-		Network: network,
-		Stage:   StageInit,
+		Stage: StageInit,
 	}
 }
 
 func (c *Ctx) Reset() {
-	c.Network = ""
 	c.Stage = StageInit
 	c.RemoteDomain = ""
 	c.RemotePort = 0

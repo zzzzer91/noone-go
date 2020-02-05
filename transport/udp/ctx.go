@@ -13,6 +13,6 @@ type ctx struct {
 
 func newCtx() *ctx {
 	return &ctx{
-		Ctx: transport.NewCtx("udp"),
+		Ctx: transport.NewCtx(),
 	}
 }
