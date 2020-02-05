@@ -18,7 +18,7 @@ func main() {
 		logLevel string
 	}
 	flag.StringVar(&flags.confPath, "c", "config.json", "config file path")
-	flag.StringVar(&flags.logLevel, "loglevel", "info", "log level")
+	flag.StringVar(&flags.logLevel, "l", "info", "log level")
 	flag.Parse()
 
 	if err := conf.LoadJson(flags.confPath); err != nil {
