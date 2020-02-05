@@ -37,7 +37,9 @@ func (l *dnsCache) get(key string) *entry {
 		return nil
 	}
 	// 这里感觉不加锁没问题？
-	v.refresh = true
+	if !v.refresh {
+		v.refresh = true
+	}
 	return v
 }
 

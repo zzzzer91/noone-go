@@ -6,14 +6,11 @@ import (
 	"noone/dnscache"
 )
 
-func ParseHeader(buf []byte) (string, net.IP, int, int, error) {
+func ParseHeader(buf []byte) (domain string, ip net.IP, port int, offset int, err error) {
 	// 7 是头部可能最小长度（AtypIpv4 时）
 	if len(buf) < 7 {
 		return "", nil, 0, 0, errors.New("header长度不合法")
 	}
-	var domain string
-	var ip net.IP
-	offset := 0
 	atyp := buf[offset]
 	offset += 1
 	switch atyp {
@@ -34,7 +31,7 @@ func ParseHeader(buf []byte) (string, net.IP, int, int, error) {
 		if err != nil {
 			return "", nil, 0, 0, err
 		}
-		// 选取第一个
+		// 暂时先选取第一个 IP
 		ip = ips[0]
 	case AtypIpv4:
 		ip = make(net.IP, net.IPv4len)
@@ -47,7 +44,7 @@ func ParseHeader(buf []byte) (string, net.IP, int, int, error) {
 	default:
 		return "", nil, 0, 0, errors.New("atyp不合法")
 	}
-	port := (int(buf[offset]) << 8) | int(buf[offset+1])
+	port = (int(buf[offset]) << 8) | int(buf[offset+1])
 	offset += 2
 	return domain, ip, port, offset, nil
 }
