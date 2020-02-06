@@ -67,11 +67,13 @@ func (c *ctx) readClient() error {
 }
 
 func (c *ctx) writeRemote() error {
-	if c.clientBufLen > 0 {
-		n, err := c.remoteConn.Write(c.clientBuf[:c.clientBufLen])
+	offset := 0
+	for c.clientBufLen > 0 {
+		n, err := c.remoteConn.Write(c.clientBuf[offset : c.clientBufLen+offset])
 		if err != nil {
 			return err
 		}
+		offset += n
 		c.clientBufLen -= n
 	}
 	return nil
@@ -98,11 +100,14 @@ func (c *ctx) readRemote() error {
 }
 
 func (c *ctx) writeClient() error {
-	if c.remoteBufLen > 0 {
-		n, err := c.clientConn.Write(c.remoteBuf[:c.remoteBufLen])
+	// 发送缓冲区可能满，这个时候要不停写，直到写完
+	offset := 0
+	for c.remoteBufLen > 0 {
+		n, err := c.clientConn.Write(c.remoteBuf[offset : c.remoteBufLen+offset])
 		if err != nil {
 			return err
 		}
+		offset += n
 		c.remoteBufLen -= n
 	}
 	return nil
@@ -112,7 +117,7 @@ func (c *ctx) handleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
-	domain, ip, port, offset, err := transport.ParseHeader(c.clientBuf)
+	domain, ip, port, offset, err := transport.ParseHeader(c.clientBuf[:c.clientBufLen])
 	if err != nil {
 		return err
 	}
@@ -155,7 +160,7 @@ func (c *ctx) handleStageHandShake() error {
 func (c *ctx) handleStream() error {
 	done := make(chan bool, 1)
 	defer close(done)
-	go func(c *ctx, done chan bool) {
+	go func(c *ctx) {
 		for {
 			if err := c.readRemote(); err != nil {
 				break
@@ -167,7 +172,7 @@ func (c *ctx) handleStream() error {
 		_ = c.clientConn.Close()
 		_ = c.remoteConn.Close()
 		done <- true
-	}(c, done)
+	}(c)
 
 	for {
 		if err := c.writeRemote(); err != nil {
@@ -181,6 +186,6 @@ func (c *ctx) handleStream() error {
 	_ = c.remoteConn.Close()
 	<-done
 	c.Stage = transport.StageDestroyed
-	// 忽略 stream 阶段出现的错误，不是很重要
+	// 暂时忽略 stream 阶段出现的错误
 	return nil
 }

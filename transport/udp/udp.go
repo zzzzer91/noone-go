@@ -38,7 +38,7 @@ func Run(addr string) {
 		copy(clientBuf, clientBuf[aes.IvLen:clientReadN])
 		clientReadN -= aes.IvLen
 		c.Decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
-		domain, ip, port, offset, err := transport.ParseHeader(clientBuf)
+		domain, ip, port, offset, err := transport.ParseHeader(clientBuf[:clientReadN])
 		if err != nil {
 			golog.Error(err)
 			continue
