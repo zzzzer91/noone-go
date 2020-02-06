@@ -155,6 +155,7 @@ func (c *ctx) handleStageHandShake() error {
 
 func (c *ctx) handleStream() error {
 	done := make(chan bool, 1)
+	defer close(done)
 	go func(c *ctx, done chan bool) {
 		for {
 			if err := c.readRemote(); err != nil {
