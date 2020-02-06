@@ -121,7 +121,6 @@ func (c *ctx) handleStageInit() error {
 	c.RemoteAddr = &net.TCPAddr{
 		IP:   ip,
 		Port: port,
-		Zone: "",
 	}
 	// src 和 dst 可以重叠
 	copy(c.clientBuf, c.clientBuf[offset:c.clientBufLen])

@@ -53,7 +53,6 @@ func Run(addr string) {
 		c.RemoteAddr = &net.UDPAddr{
 			IP:   ip,
 			Port: port,
-			Zone: "",
 		}
 
 		// 绑定随机地址
@@ -62,15 +61,15 @@ func Run(addr string) {
 			golog.Error(err)
 			continue
 		}
-
 		golog.Info("UDP sendto " + c.RemoteAddr.String())
-		_, err = c.lRemote.WriteTo(clientBuf[offset:clientReadN+offset], c.RemoteAddr.(*net.UDPAddr))
+		_, err = c.lRemote.WriteTo(clientBuf[offset:clientReadN+offset], c.RemoteAddr)
 		if err != nil {
 			golog.Error(err)
 			continue
 		}
 
 		go func(c *ctx) {
+			defer c.lRemote.Close()
 			remoteBuf := make([]byte, remoteBufCapacity)
 			if err := aes.GenRandomIv(remoteBuf[:aes.IvLen]); err != nil {
 				return
@@ -86,7 +85,7 @@ func Run(addr string) {
 			n += aes.IvLen + offset
 			c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), remoteBuf[:aes.IvLen])
 			c.Encrypter.Encrypt(remoteBuf[aes.IvLen:n], remoteBuf[aes.IvLen:n])
-			_, err = c.lClient.WriteTo(remoteBuf[:n], c.ClientAddr.(*net.UDPAddr))
+			_, err = c.lClient.WriteTo(remoteBuf[:n], c.ClientAddr)
 			if err != nil {
 				return
 			}
