@@ -62,7 +62,7 @@ func (c *ctx) readClient() error {
 	}
 	// Decrypt 和 Encrypt 的 dst 和 src 内存区域允许重叠，但是有条件：
 	// 那就是 &dst[0] 和 &src[0] 必须相同
-	c.Decrypter.Decrypt(c.clientBuf, c.clientBuf[:c.clientBufLen])
+	c.Decrypter.Decrypt(c.clientBuf[:c.clientBufLen], c.clientBuf[:c.clientBufLen])
 	return nil
 }
 
@@ -93,13 +93,14 @@ func (c *ctx) readRemote() error {
 	if err != nil {
 		return err
 	}
-	c.remoteBufLen = n
-	c.Encrypter.Encrypt(c.remoteBuf[offset:], c.remoteBuf[offset:offset+n])
-	c.remoteBufLen += offset
+	c.remoteBufLen = n + offset
+	c.Encrypter.Encrypt(c.remoteBuf[offset:c.remoteBufLen], c.remoteBuf[offset:c.remoteBufLen])
 	return nil
 }
 
 func (c *ctx) writeClient() error {
+	// golog.Debug("writeClient: " + strconv.Itoa(c.remoteBufLen))
+
 	// 发送缓冲区可能满，这个时候要不停写，直到写完
 	offset := 0
 	for c.remoteBufLen > 0 {
