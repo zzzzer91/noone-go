@@ -2,14 +2,17 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/kataras/golog"
 	"noone/conf"
+	"noone/crypto"
+	"noone/dnscache"
 	"noone/transport/tcp"
 	"noone/transport/udp"
+	"noone/user"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -21,16 +24,29 @@ func main() {
 	flag.StringVar(&flags.logLevel, "l", "info", "log level")
 	flag.Parse()
 
-	if err := conf.LoadJson(flags.confPath); err != nil {
+	ssConf, err := conf.LoadJson(flags.confPath)
+	if err != nil {
 		golog.Fatal(err)
 	}
 	golog.SetLevel(flags.logLevel)
 
 	golog.Info("Noone started!")
 
-	addr := fmt.Sprintf("%s:%d", conf.SS.Server, conf.SS.ServerPort)
-	go tcp.Run(addr)
-	go udp.Run(addr)
+	userInfo := user.Info{
+		Port:     ssConf.ServerPort,
+		Method:   ssConf.Method,
+		Password: ssConf.Password,
+		Key:      crypto.Kdf(ssConf.Password, 16),
+		DnsCache: dnscache.NewCache(),
+	}
+	// 开个协程定时清理 DNS 缓存
+	go func() {
+		time.Sleep(5 * time.Minute)
+		golog.Debug("定时清理 DNS 缓存")
+		userInfo.DnsCache.Clear()
+	}()
+	go tcp.Run(&userInfo)
+	go udp.Run(&userInfo)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

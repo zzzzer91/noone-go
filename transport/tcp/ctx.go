@@ -4,8 +4,6 @@ import (
 	"errors"
 	"github.com/kataras/golog"
 	"net"
-	"noone/conf"
-	"noone/crypto"
 	"noone/crypto/aes"
 	"noone/transport"
 	"strconv"
@@ -19,14 +17,6 @@ type ctx struct {
 	clientBufLen int
 	remoteBuf    []byte
 	remoteBufLen int
-}
-
-func newCtx() *ctx {
-	return &ctx{
-		Ctx:       transport.NewCtx(),
-		clientBuf: make([]byte, clientBufCapacity),
-		remoteBuf: make([]byte, remoteBufCapacity),
-	}
 }
 
 func (c *ctx) reset() {
@@ -53,7 +43,7 @@ func (c *ctx) readClient() error {
 		if n < aes.IvLen {
 			return errors.New("IV长度不合法")
 		}
-		c.Decrypter = aes.NewCtrDecrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), c.clientBuf[:aes.IvLen])
+		c.Decrypter = aes.NewCtrDecrypter(c.UserInfo.Key, c.clientBuf[:aes.IvLen])
 		c.clientBufLen -= aes.IvLen
 		if c.clientBufLen == 0 {
 			return nil
@@ -86,7 +76,7 @@ func (c *ctx) readRemote() error {
 		if err := aes.GenRandomIv(c.remoteBuf[:aes.IvLen]); err != nil {
 			return err
 		}
-		c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), c.remoteBuf[:aes.IvLen])
+		c.Encrypter = aes.NewCtrEncrypter(c.UserInfo.Key, c.remoteBuf[:aes.IvLen])
 		offset = aes.IvLen
 	}
 	n, err := c.remoteConn.Read(c.remoteBuf[offset:])
@@ -118,15 +108,9 @@ func (c *ctx) handleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
-	domain, ip, port, offset, err := transport.ParseHeader(c.clientBuf[:c.clientBufLen])
+	offset, err := c.ParseHeader(c.clientBuf[:c.clientBufLen])
 	if err != nil {
 		return err
-	}
-	c.RemoteDomain = domain
-	c.RemotePort = port
-	c.RemoteAddr = &net.TCPAddr{
-		IP:   ip,
-		Port: port,
 	}
 	// src 和 dst 可以重叠
 	copy(c.clientBuf, c.clientBuf[offset:c.clientBufLen])
@@ -146,6 +130,11 @@ func (c *ctx) handleStageHandShake() error {
 	golog.Info("Connecting " + temp)
 	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
 	if err != nil {
+		// 这个 Domain 对应的 IP 已经过期，把它从缓存删除
+		// TODO，当访问被墙域名时，会不停的加入缓存和从缓存删除
+		//if c.RemoteDomain != "" {
+		//	c.UserInfo.DnsCache.Del(c.RemoteDomain)
+		//}
 		return errors.New("Connect " + temp + " error: " + err.Error())
 	}
 	c.remoteConn = conn

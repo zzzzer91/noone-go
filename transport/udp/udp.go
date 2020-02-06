@@ -3,14 +3,14 @@ package udp
 import (
 	"github.com/kataras/golog"
 	"net"
-	"noone/conf"
-	"noone/crypto"
 	"noone/crypto/aes"
 	"noone/transport"
+	"noone/user"
+	"strconv"
 )
 
-func Run(addr string) {
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+func Run(userInfo *user.Info) {
+	udpAddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(userInfo.Port))
 	if err != nil {
 		golog.Fatal(err)
 	}
@@ -29,16 +29,21 @@ func Run(addr string) {
 			golog.Error("头部长度不合法")
 			continue
 		}
-		c := newCtx()
-		c.lClient = lClient
-		c.ClientAddr = clientAddr
+		c := &ctx{
+			Ctx: transport.Ctx{
+				Network:    "udp",
+				UserInfo:   userInfo,
+				ClientAddr: clientAddr,
+				Decrypter:  aes.NewCtrDecrypter(userInfo.Key, clientBuf[:aes.IvLen]),
+			},
+			lClient: lClient,
+		}
 		golog.Info("UDP readfrom " + c.ClientAddr.String())
 
-		c.Decrypter = aes.NewCtrDecrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), clientBuf[:aes.IvLen])
 		copy(clientBuf, clientBuf[aes.IvLen:clientReadN])
 		clientReadN -= aes.IvLen
 		c.Decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
-		domain, ip, port, offset, err := transport.ParseHeader(clientBuf[:clientReadN])
+		offset, err := c.ParseHeader(clientBuf[:clientReadN])
 		if err != nil {
 			golog.Error(err)
 			continue
@@ -47,12 +52,6 @@ func Run(addr string) {
 		if clientReadN <= 0 {
 			golog.Error("udp没有数据")
 			continue
-		}
-		c.RemoteDomain = domain
-		c.RemotePort = port
-		c.RemoteAddr = &net.UDPAddr{
-			IP:   ip,
-			Port: port,
 		}
 
 		// 绑定随机地址
@@ -83,7 +82,7 @@ func Run(addr string) {
 				return
 			}
 			n += aes.IvLen + offset
-			c.Encrypter = aes.NewCtrEncrypter(crypto.Kdf(conf.SS.Password, aes.IvLen), remoteBuf[:aes.IvLen])
+			c.Encrypter = aes.NewCtrEncrypter(c.UserInfo.Key, remoteBuf[:aes.IvLen])
 			c.Encrypter.Encrypt(remoteBuf[aes.IvLen:n], remoteBuf[aes.IvLen:n])
 			_, err = c.lClient.WriteTo(remoteBuf[:n], c.ClientAddr)
 			if err != nil {

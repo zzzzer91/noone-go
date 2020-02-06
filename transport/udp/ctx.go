@@ -10,9 +10,3 @@ type ctx struct {
 	lClient *net.UDPConn
 	lRemote *net.UDPConn
 }
-
-func newCtx() *ctx {
-	return &ctx{
-		Ctx: transport.NewCtx(),
-	}
-}

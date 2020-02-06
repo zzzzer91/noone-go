@@ -3,14 +3,53 @@ package transport
 import (
 	"errors"
 	"net"
-	"noone/dnscache"
+	"noone/crypto"
+	"noone/user"
 )
 
-func ParseHeader(buf []byte) (domain string, ip net.IP, port int, offset int, err error) {
+const (
+	StageInit      = iota // 解析 header 阶段，获取 iv, remote 的 ip 和 port
+	StageHandShake        // TCP 和 remote 握手阶段
+	StageStream           // TCP 传输阶段
+	StageDestroyed        // 该连接已销毁
+)
+
+// atyp
+const (
+	AtypIpv4   = 0x01
+	AtypDomain = 0x03
+	AtypIpv6   = 0x04
+)
+
+type Ctx struct {
+	Network      string
+	Stage        int
+	RemoteDomain string
+	RemotePort   int
+	ClientAddr   net.Addr
+	RemoteAddr   net.Addr
+	Encrypter    crypto.Encrypter
+	Decrypter    crypto.Decrypter
+	UserInfo     *user.Info
+}
+
+func (c *Ctx) Reset() {
+	// 某些字段不需要重置，如：Network、UserInfo
+	c.Stage = StageInit
+	c.RemoteDomain = ""
+	c.RemotePort = 0
+	c.ClientAddr = nil
+	c.RemoteAddr = nil
+	c.Encrypter = nil
+	c.Decrypter = nil
+}
+
+func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
 	// 7 是头部可能最小长度（AtypIpv4 时）
 	if len(buf) < 7 {
-		return "", nil, 0, 0, errors.New("header长度不合法")
+		return 0, errors.New("header长度不合法")
 	}
+	var ip net.IP
 	atyp := buf[offset]
 	offset += 1
 	switch atyp {
@@ -18,7 +57,7 @@ func ParseHeader(buf []byte) (domain string, ip net.IP, port int, offset int, er
 		domainLen := int(buf[offset])
 		// 域名长度允许范围
 		if domainLen < 4 || domainLen > 2000 {
-			return "", nil, 0, 0, errors.New("域名长度不合法")
+			return 0, errors.New("域名长度不合法")
 		}
 		offset += 1
 		// domainLen 长度要检查，不然会被爆内存
@@ -26,10 +65,10 @@ func ParseHeader(buf []byte) (domain string, ip net.IP, port int, offset int, er
 		copy(domainBytes, buf[offset:])
 		offset += domainLen
 		// 解析IP
-		domain = string(domainBytes)
-		ips, err := dnscache.LookupIP(domain)
+		c.RemoteDomain = string(domainBytes)
+		ips, err := c.UserInfo.DnsCache.LookupIP(c.RemoteDomain)
 		if err != nil {
-			return "", nil, 0, 0, err
+			return 0, err
 		}
 		// 暂时先选取第一个 IP
 		ip = ips[0]
@@ -42,9 +81,25 @@ func ParseHeader(buf []byte) (domain string, ip net.IP, port int, offset int, er
 		copy(ip, buf[offset:])
 		offset += net.IPv6len
 	default:
-		return "", nil, 0, 0, errors.New("atyp不合法")
+		return 0, errors.New("atyp不合法")
 	}
-	port = (int(buf[offset]) << 8) | int(buf[offset+1])
+	c.RemotePort = (int(buf[offset]) << 8) | int(buf[offset+1])
 	offset += 2
-	return domain, ip, port, offset, nil
+
+	switch c.Network {
+	case "tcp":
+		c.RemoteAddr = &net.TCPAddr{
+			IP:   ip,
+			Port: c.RemotePort,
+		}
+	case "udp":
+		c.RemoteAddr = &net.UDPAddr{
+			IP:   ip,
+			Port: c.RemotePort,
+		}
+	default:
+		return 0, errors.New("network不合法")
+	}
+
+	return offset, nil
 }

@@ -3,14 +3,8 @@
 package dnscache
 
 import (
-	"github.com/kataras/golog"
 	"net"
 	"sync"
-	"time"
-)
-
-const (
-	clearInterval = 5 * time.Minute
 )
 
 type entry struct {
@@ -18,24 +12,30 @@ type entry struct {
 	refresh bool // 一定时间内使用过则为 true
 }
 
-type dnsCache struct {
-	cache map[string]*entry // cache 可能变得很大？
-	lock  sync.RWMutex
+type Cache struct {
+	dict map[string]*entry // dict 可能变得很大？
+	lock sync.RWMutex
 }
 
-func (l *dnsCache) set(key string, ips []net.IP) {
-	l.lock.Lock()
-	l.cache[key] = &entry{
+func NewCache() *Cache {
+	return &Cache{
+		dict: make(map[string]*entry),
+	}
+}
+
+func (c *Cache) set(key string, ips []net.IP) {
+	c.lock.Lock()
+	c.dict[key] = &entry{
 		ips:     ips,
 		refresh: false, // 设为 false，接下来一段时间不用，就会被清理
 	}
-	l.lock.Unlock()
+	c.lock.Unlock()
 }
 
-func (l *dnsCache) get(key string) []net.IP {
-	l.lock.RLock()
-	defer l.lock.RUnlock()
-	v, ok := l.cache[key]
+func (c *Cache) get(key string) []net.IP {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	v, ok := c.dict[key]
 	if !ok {
 		return nil
 	}
@@ -44,46 +44,33 @@ func (l *dnsCache) get(key string) []net.IP {
 	return v.ips
 }
 
-func (l *dnsCache) del(key string) {
-	l.lock.Lock()
-	delete(l.cache, key)
-	l.lock.Unlock()
+func (c *Cache) Del(key string) {
+	c.lock.Lock()
+	delete(c.dict, key)
+	c.lock.Unlock()
 }
 
-func (l *dnsCache) clear() {
-	temp := make(map[string]*entry, len(l.cache))
-	l.lock.Lock()
-	for k, v := range l.cache {
+func (c *Cache) Clear() {
+	temp := make(map[string]*entry, len(c.dict))
+	c.lock.Lock()
+	for k, v := range c.dict {
 		if v.refresh {
 			v.refresh = false
 			temp[k] = v
 		}
 	}
-	l.cache = temp
-	l.lock.Unlock()
+	c.dict = temp
+	c.lock.Unlock()
 }
 
-var defaultDnsCache = &dnsCache{
-	cache: make(map[string]*entry),
-}
-
-func init() {
-	// 开个协程定时清理
-	go func() {
-		time.Sleep(clearInterval)
-		golog.Debug("定时清理 DNS 缓存")
-		defaultDnsCache.clear()
-	}()
-}
-
-func LookupIP(host string) ([]net.IP, error) {
-	if v := defaultDnsCache.get(host); v != nil {
+func (c *Cache) LookupIP(host string) ([]net.IP, error) {
+	if v := c.get(host); v != nil {
 		return v, nil
 	}
 	ips, err := net.LookupIP(host)
 	if err != nil {
 		return nil, err
 	}
-	defaultDnsCache.set(host, ips)
+	c.set(host, ips)
 	return ips, nil
 }

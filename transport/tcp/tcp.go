@@ -4,11 +4,14 @@ import (
 	"github.com/kataras/golog"
 	"io"
 	"net"
+	"noone/transport"
+	"noone/user"
+	"strconv"
 	"sync"
 )
 
-func Run(addr string) {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+func Run(userInfo *user.Info) {
+	tcpAddr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(userInfo.Port))
 	if err != nil {
 		golog.Fatal(err)
 	}
@@ -16,9 +19,17 @@ func Run(addr string) {
 	if err != nil {
 		golog.Fatal(err)
 	}
-	pool := &sync.Pool{
+	// 复用 ctx 对象，防止缓冲区不停分配，回收，也许能提高性能？
+	userInfo.Pool = &sync.Pool{
 		New: func() interface{} {
-			return newCtx()
+			return &ctx{
+				Ctx: transport.Ctx{
+					Network:  "tcp",
+					UserInfo: userInfo,
+				},
+				clientBuf: make([]byte, clientBufCapacity),
+				remoteBuf: make([]byte, remoteBufCapacity),
+			}
 		},
 	}
 	for {
@@ -32,15 +43,15 @@ func Run(addr string) {
 			golog.Error(err)
 			continue
 		}
-		go handle(pool, conn)
+		go handle(userInfo, conn)
 	}
 }
 
-func handle(pool *sync.Pool, conn *net.TCPConn) {
-	c := pool.Get().(*ctx)
+func handle(userInfo *user.Info, conn *net.TCPConn) {
+	c := userInfo.Pool.Get().(*ctx)
 	c.ClientAddr = conn.RemoteAddr()
 	c.clientConn = conn
-	defer pool.Put(c)
+	defer userInfo.Pool.Put(c)
 	defer c.reset()
 
 	golog.Debug("TCP accept " + c.ClientAddr.String())
