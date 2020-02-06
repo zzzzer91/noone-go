@@ -10,6 +10,8 @@ type Info struct {
 	Method   string
 	Password string
 	Key      []byte
+
 	DnsCache *dnscache.Cache // 每个用户都创建一个 DNS 缓存
-	Pool     *sync.Pool      // 对象复用池，复用 `tcp.ctx`
+
+	lock sync.RWMutex // 某些情况可能要加锁
 }
