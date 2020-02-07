@@ -6,23 +6,23 @@ import (
 )
 
 type SSConf struct {
-	Server       string            `json:"server"`
-	ServerPort   int               `json:"server_port"`
-	Password     string            `json:"password"`
-	Timeout      int               `json:"timeout"`
-	Method       string            `json:"method"`
-	PortPassword map[string]string `json:"port_password"`
+	Servers []struct {
+		Server     string `json:"server"`
+		ServerPort int    `json:"server_port"`
+		Password   string `json:"password"`
+		Method     string `json:"method"`
+	} `json:"servers"`
 }
 
-func LoadJson(path string) (SSConf, error) {
-	var conf SSConf
+func LoadJson(path string) (*SSConf, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return conf, err
+		return nil, err
 	}
+	var conf SSConf
 	err = json.Unmarshal(b, &conf)
 	if err != nil {
-		return conf, err
+		return nil, err
 	}
-	return conf, nil
+	return &conf, nil
 }

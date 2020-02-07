@@ -30,7 +30,7 @@ type Ctx struct {
 	RemoteAddr   net.Addr
 	Encrypter    crypto.Encrypter
 	Decrypter    crypto.Decrypter
-	UserInfo     *user.Info
+	UserInfo     *user.User
 }
 
 func (c *Ctx) Reset() {

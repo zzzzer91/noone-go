@@ -9,8 +9,8 @@ import (
 	"strconv"
 )
 
-func Run(userInfo *user.Info) {
-	udpAddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(userInfo.Port))
+func Run(userInfo *user.User) {
+	udpAddr, err := net.ResolveUDPAddr("udp", userInfo.Server+":"+strconv.Itoa(userInfo.Port))
 	if err != nil {
 		golog.Fatal(err)
 	}

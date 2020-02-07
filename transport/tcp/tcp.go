@@ -10,8 +10,8 @@ import (
 	"sync"
 )
 
-func Run(userInfo *user.Info) {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(userInfo.Port))
+func Run(userInfo *user.User) {
+	tcpAddr, err := net.ResolveTCPAddr("tcp", userInfo.Server+":"+strconv.Itoa(userInfo.Port))
 	if err != nil {
 		golog.Fatal(err)
 	}

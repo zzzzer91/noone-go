@@ -1,11 +1,14 @@
 package user
 
 import (
+	"noone/conf"
+	"noone/crypto"
 	"noone/dnscache"
 	"sync"
 )
 
-type Info struct {
+type User struct {
+	Server   string
 	Port     int
 	Method   string
 	Password string
@@ -14,4 +17,19 @@ type Info struct {
 	DnsCache *dnscache.Cache // Every user has own DNS cache
 
 	lock sync.RWMutex
+}
+
+func InitUsers(ssConf *conf.SSConf) []*User {
+	users := make([]*User, len(ssConf.Servers))
+	for i, s := range ssConf.Servers {
+		users[i] = &User{
+			Server:   s.Server,
+			Port:     s.ServerPort,
+			Method:   s.Method,
+			Password: s.Password,
+			Key:      crypto.Kdf(s.Password, 16),
+			DnsCache: dnscache.NewCache(),
+		}
+	}
+	return users
 }

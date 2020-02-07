@@ -1,19 +1,30 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"github.com/kataras/golog"
 	"noone/conf"
-	"noone/crypto"
-	"noone/dnscache"
+	"noone/manager"
 	"noone/transport/tcp"
 	"noone/transport/udp"
 	"noone/user"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
+
+func runOne(u *user.User) error {
+	if _, ok := manager.M.UsedPorts[u.Port]; ok {
+		return errors.New(strconv.Itoa(u.Port) + " is used")
+	}
+	manager.M.UsedPorts[u.Port] = struct{}{}
+	go tcp.Run(u)
+	go udp.Run(u)
+	return nil
+}
 
 func main() {
 	var flags struct {
@@ -30,23 +41,26 @@ func main() {
 	}
 	golog.SetLevel(flags.logLevel)
 
-	golog.Info("Noone started!")
+	manager.M.Users = user.InitUsers(ssConf)
 
-	userInfo := &user.Info{
-		Port:     ssConf.ServerPort,
-		Method:   ssConf.Method,
-		Password: ssConf.Password,
-		Key:      crypto.Kdf(ssConf.Password, 16),
-		DnsCache: dnscache.NewCache(),
+	for _, u := range manager.M.Users {
+		if err := runOne(u); err != nil {
+			golog.Error(err)
+		}
 	}
-	// clear the expired dns caches regularly
+
 	go func() {
-		time.Sleep(5 * time.Minute)
-		golog.Debug("定时清理 DNS 缓存")
-		userInfo.DnsCache.Clear()
+		t := time.NewTicker(5 * time.Minute)
+		defer t.Stop()
+		for range t.C {
+			golog.Debug("Clear the expired DNS caches regularly")
+			for _, u := range manager.M.Users {
+				u.DnsCache.Clear()
+			}
+		}
 	}()
-	go tcp.Run(userInfo)
-	go udp.Run(userInfo)
+
+	golog.Info("Noone started")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
