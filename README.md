@@ -1,5 +1,22 @@
 # Noone
 
-Shadowsocks 服务端 Go 实现。
+A Go port of Shadowsocks server. Currently, the only supported cipher is AES-128-CTR.
 
-目前只支持 aes-128-ctr。
+## Build
+
+```bash
+$ ./compile.sh
+```
+
+## Usage
+
+```bash
+$ cd bin
+$ noone -c <config file>
+```
+
+Or run Noone in the background:
+
+```bash
+$ nohup noone -c <config file> >> noone.log &
+```
