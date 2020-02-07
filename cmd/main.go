@@ -45,7 +45,7 @@ func main() {
 
 	for _, u := range manager.M.Users {
 		if err := runOne(u); err != nil {
-			golog.Error(err)
+			golog.Fatal(err)
 		}
 	}
 
