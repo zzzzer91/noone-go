@@ -32,7 +32,7 @@ func main() {
 
 	golog.Info("Noone started!")
 
-	userInfo := user.Info{
+	userInfo := &user.Info{
 		Port:     ssConf.ServerPort,
 		Method:   ssConf.Method,
 		Password: ssConf.Password,
@@ -45,8 +45,8 @@ func main() {
 		golog.Debug("定时清理 DNS 缓存")
 		userInfo.DnsCache.Clear()
 	}()
-	go tcp.Run(&userInfo)
-	go udp.Run(&userInfo)
+	go tcp.Run(userInfo)
+	go udp.Run(userInfo)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
