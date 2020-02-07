@@ -39,7 +39,7 @@ func main() {
 		Key:      crypto.Kdf(ssConf.Password, 16),
 		DnsCache: dnscache.NewCache(),
 	}
-	// 开个协程定时清理 DNS 缓存
+	// clear the expired dns caches regularly
 	go func() {
 		time.Sleep(5 * time.Minute)
 		golog.Debug("定时清理 DNS 缓存")

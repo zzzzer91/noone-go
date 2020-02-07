@@ -11,7 +11,7 @@ type Info struct {
 	Password string
 	Key      []byte
 
-	DnsCache *dnscache.Cache // 每个用户都创建一个 DNS 缓存
+	DnsCache *dnscache.Cache // Every user has own DNS cache
 
-	lock sync.RWMutex // 某些情况可能要加锁
+	lock sync.RWMutex
 }
