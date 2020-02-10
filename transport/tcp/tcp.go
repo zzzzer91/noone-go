@@ -19,7 +19,7 @@ func Run(userInfo *user.User) {
 	if err != nil {
 		golog.Fatal(err)
 	}
-	// 复用 ctx 对象，防止缓冲区不停分配，回收，也许能提高性能？
+	// reuse the ctx object
 	pool := &sync.Pool{
 		New: func() interface{} {
 			return &ctx{
@@ -38,16 +38,16 @@ func Run(userInfo *user.User) {
 			golog.Error(err)
 			continue
 		}
-		err = conn.SetKeepAlive(true)
-		if err != nil {
-			golog.Error(err)
-			continue
-		}
 		go handle(pool, conn)
 	}
 }
 
 func handle(pool *sync.Pool, conn *net.TCPConn) {
+	if err := conn.SetKeepAlive(true); err != nil {
+		golog.Error(err)
+		return
+	}
+
 	c := pool.Get().(*ctx)
 	c.ClientAddr = conn.RemoteAddr()
 	c.clientConn = conn
