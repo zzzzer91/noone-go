@@ -13,7 +13,7 @@ const (
 
 func GenRandomIv(iv []byte) error {
 	if len(iv) != IvLen {
-		return errors.New("IV长度不合法")
+		return errors.New("invaild IV length")
 	}
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return err

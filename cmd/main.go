@@ -18,7 +18,7 @@ import (
 
 func runOne(u *user.User) error {
 	if _, ok := manager.M.UsedPorts[u.Port]; ok {
-		return errors.New(strconv.Itoa(u.Port) + " is used")
+		return errors.New(strconv.Itoa(u.Port) + " has been used")
 	}
 	manager.M.UsedPorts[u.Port] = struct{}{}
 	go tcp.Run(u)
