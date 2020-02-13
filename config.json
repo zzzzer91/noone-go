@@ -1,10 +1,10 @@
 {
     "servers":[
         {
-            "Server": "0.0.0.0",
-            "server_port":9527,
-            "password":"123456",
-            "method":"aes-128-ctr"
+            "Server": "127.0.0.1",
+            "server_port": 9527,
+            "password": "123456",
+            "method": "aes-128-ctr"
         }
     ]
 } 
