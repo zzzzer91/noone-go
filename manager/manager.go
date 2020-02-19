@@ -2,21 +2,17 @@ package manager
 
 import (
 	"noone/user"
+	"sync"
 )
 
 type Manager struct {
-	Users     []*user.User
-	NewUser   chan *user.User
-	UsedPorts map[int]struct{}
+	Users []*user.User
+	// NewUser    chan *user.User // wait for the new user
+	UsedPorts  map[int]struct{}
+	TcpCtxPool *sync.Pool // reuse the tcp.ctx object
 }
 
-var M *Manager
-
-func init() {
-	m := Manager{
-		Users:     nil,
-		NewUser:   make(chan *user.User),
-		UsedPorts: make(map[int]struct{}),
-	}
-	M = &m
+var M = &Manager{
+	// NewUser:   make(chan *user.User),
+	UsedPorts: make(map[int]struct{}),
 }

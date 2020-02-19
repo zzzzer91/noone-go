@@ -34,7 +34,7 @@ type Ctx struct {
 }
 
 func (c *Ctx) Reset() {
-	// 某些字段不需要重置，如：Network、UserInfo
+	// some fields don't need reset, e.g., Network
 	c.Stage = StageInit
 	c.RemoteDomain = ""
 	c.RemotePort = 0
@@ -42,6 +42,7 @@ func (c *Ctx) Reset() {
 	c.RemoteAddr = nil
 	c.Encrypter = nil
 	c.Decrypter = nil
+	c.UserInfo = nil
 }
 
 func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {

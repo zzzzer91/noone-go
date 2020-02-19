@@ -4,10 +4,9 @@ import (
 	"github.com/kataras/golog"
 	"io"
 	"net"
-	"noone/transport"
+	"noone/manager"
 	"noone/user"
 	"strconv"
-	"sync"
 )
 
 func Run(userInfo *user.User) {
@@ -19,39 +18,28 @@ func Run(userInfo *user.User) {
 	if err != nil {
 		golog.Fatal(err)
 	}
-	// reuse the ctx object
-	pool := &sync.Pool{
-		New: func() interface{} {
-			return &ctx{
-				Ctx: transport.Ctx{
-					Network:  "tcp",
-					UserInfo: userInfo,
-				},
-				clientBuf: make([]byte, clientBufCapacity),
-				remoteBuf: make([]byte, remoteBufCapacity),
-			}
-		},
-	}
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
 			golog.Error(err)
 			continue
 		}
-		go handle(pool, conn)
+
+		if err := conn.SetKeepAlive(true); err != nil {
+			golog.Error(err)
+			return
+		}
+		c := manager.M.TcpCtxPool.Get().(*ctx)
+		c.ClientAddr = conn.RemoteAddr()
+		c.clientConn = conn
+		c.UserInfo = userInfo
+
+		go handle(c)
 	}
 }
 
-func handle(pool *sync.Pool, conn *net.TCPConn) {
-	if err := conn.SetKeepAlive(true); err != nil {
-		golog.Error(err)
-		return
-	}
-
-	c := pool.Get().(*ctx)
-	c.ClientAddr = conn.RemoteAddr()
-	c.clientConn = conn
-	defer pool.Put(c)
+func handle(c *ctx) {
+	defer manager.M.TcpCtxPool.Put(c)
 	defer c.reset()
 
 	golog.Debug("TCP accept " + c.ClientAddr.String())

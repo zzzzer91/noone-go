@@ -21,6 +21,16 @@ type ctx struct {
 	remoteBufIdx int
 }
 
+func NewCtx() *ctx {
+	return &ctx{
+		Ctx: transport.Ctx{
+			Network: "tcp",
+		},
+		clientBuf: make([]byte, clientBufCapacity),
+		remoteBuf: make([]byte, remoteBufCapacity),
+	}
+}
+
 func (c *ctx) reset() {
 	c.Ctx.Reset()
 	if c.clientConn != nil {

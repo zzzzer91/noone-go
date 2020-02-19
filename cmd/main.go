@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -42,6 +43,11 @@ func main() {
 	golog.SetLevel(flags.logLevel)
 
 	manager.M.Users = user.InitUsers(ssConf)
+	manager.M.TcpCtxPool = &sync.Pool{
+		New: func() interface{} {
+			return tcp.NewCtx()
+		},
+	}
 
 	for _, u := range manager.M.Users {
 		if err := runOne(u); err != nil {
