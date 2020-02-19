@@ -15,14 +15,14 @@ type ctx struct {
 	remoteConn   *net.TCPConn
 	clientBuf    []byte
 	clientBufLen int
+	clientBufIdx int // 已用数据偏移
 	remoteBuf    []byte
 	remoteBufLen int
+	remoteBufIdx int
 }
 
 func (c *ctx) reset() {
 	c.Ctx.Reset()
-	c.clientBufLen = 0
-	c.remoteBufLen = 0
 	if c.clientConn != nil {
 		_ = c.clientConn.Close()
 		c.clientConn = nil
@@ -31,6 +31,10 @@ func (c *ctx) reset() {
 		_ = c.remoteConn.Close()
 		c.remoteConn = nil
 	}
+	c.clientBufLen = 0
+	c.clientBufIdx = 0
+	c.remoteBufLen = 0
+	c.remoteBufIdx = 0
 }
 
 func (c *ctx) readClient() error {
@@ -39,32 +43,33 @@ func (c *ctx) readClient() error {
 		return err
 	}
 	c.clientBufLen = n
+	c.clientBufIdx = 0
 	if c.Decrypter == nil {
 		if n < aes.IvLen {
 			return errors.New("IV长度不合法")
 		}
 		c.Decrypter = aes.NewCtrDecrypter(c.UserInfo.Key, c.clientBuf[:aes.IvLen])
 		c.clientBufLen -= aes.IvLen
+		c.clientBufIdx += aes.IvLen
 		if c.clientBufLen == 0 {
 			return nil
 		}
-		copy(c.clientBuf, c.clientBuf[aes.IvLen:n])
 	}
 	// Decrypt 和 Encrypt 的 dst 和 src 内存区域允许重叠，但是有条件：
 	// 那就是 &dst[0] 和 &src[0] 必须相同
-	c.Decrypter.Decrypt(c.clientBuf[:c.clientBufLen], c.clientBuf[:c.clientBufLen])
+	tmp := c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen]
+	c.Decrypter.Decrypt(tmp, tmp)
 	return nil
 }
 
 func (c *ctx) writeRemote() error {
-	offset := 0
 	for c.clientBufLen > 0 {
-		n, err := c.remoteConn.Write(c.clientBuf[offset : c.clientBufLen+offset])
+		n, err := c.remoteConn.Write(c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen])
 		if err != nil {
 			return err
 		}
-		offset += n
 		c.clientBufLen -= n
+		c.clientBufIdx += n
 	}
 	return nil
 }
@@ -84,6 +89,7 @@ func (c *ctx) readRemote() error {
 		return err
 	}
 	c.remoteBufLen = n + offset
+	c.remoteBufIdx = 0
 	c.Encrypter.Encrypt(c.remoteBuf[offset:c.remoteBufLen], c.remoteBuf[offset:c.remoteBufLen])
 	return nil
 }
@@ -92,14 +98,13 @@ func (c *ctx) writeClient() error {
 	// golog.Debug("writeClient: " + strconv.Itoa(c.remoteBufLen))
 
 	// 发送缓冲区可能满，这个时候要不停写，直到写完
-	offset := 0
 	for c.remoteBufLen > 0 {
-		n, err := c.clientConn.Write(c.remoteBuf[offset : c.remoteBufLen+offset])
+		n, err := c.clientConn.Write(c.remoteBuf[c.remoteBufIdx : c.remoteBufIdx+c.remoteBufLen])
 		if err != nil {
 			return err
 		}
-		offset += n
 		c.remoteBufLen -= n
+		c.remoteBufIdx += n
 	}
 	return nil
 }
@@ -108,13 +113,12 @@ func (c *ctx) handleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
-	offset, err := c.ParseHeader(c.clientBuf[:c.clientBufLen])
+	offset, err := c.ParseHeader(c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen])
 	if err != nil {
 		return err
 	}
-	// src 和 dst 可以重叠
-	copy(c.clientBuf, c.clientBuf[offset:c.clientBufLen])
 	c.clientBufLen -= offset
+	c.clientBufIdx += offset
 
 	c.Stage = transport.StageHandShake
 	return nil
