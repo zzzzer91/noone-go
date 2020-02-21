@@ -6,12 +6,12 @@ import (
 )
 
 type SSConf struct {
-	Servers []struct {
+	Users []struct {
 		Server     string `json:"server"`
 		ServerPort int    `json:"server_port"`
 		Password   string `json:"password"`
 		Method     string `json:"method"`
-	} `json:"servers"`
+	} `json:"users"`
 }
 
 func LoadJson(path string) (*SSConf, error) {

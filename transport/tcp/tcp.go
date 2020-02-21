@@ -51,7 +51,7 @@ func handle(c *ctx) {
 		golog.Error(err)
 		return
 	}
-	if err := c.handleStream(); err != nil {
+	if err := c.handleStageStream(); err != nil {
 		// 对端关闭，忽略
 		if err == io.EOF {
 			return

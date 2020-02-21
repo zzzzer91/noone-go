@@ -56,7 +56,7 @@ func (c *ctx) readClient() error {
 	c.clientBufIdx = 0
 	if c.Decrypter == nil {
 		if n < aes.IvLen {
-			return errors.New("IV长度不合法")
+			return errors.New("IV length is invaild")
 		}
 		c.Decrypter = aes.NewCtrDecrypter(c.UserInfo.Key, c.clientBuf[:aes.IvLen])
 		c.clientBufLen -= aes.IvLen
@@ -161,7 +161,7 @@ func (c *ctx) handleStageHandShake() error {
 	return nil
 }
 
-func (c *ctx) handleStream() error {
+func (c *ctx) handleStageStream() error {
 	done := make(chan bool, 1)
 	defer close(done)
 	go func(c *ctx) {
