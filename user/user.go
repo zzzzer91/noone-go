@@ -20,8 +20,8 @@ type User struct {
 }
 
 func InitUsers(ssConf *conf.SSConf) []*User {
-	users := make([]*User, len(ssConf.Servers))
-	for i, s := range ssConf.Servers {
+	users := make([]*User, len(ssConf.Users))
+	for i, s := range ssConf.Users {
 		users[i] = &User{
 			Server:   s.Server,
 			Port:     s.ServerPort,
