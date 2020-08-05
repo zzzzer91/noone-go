@@ -2,7 +2,7 @@ package udp
 
 import (
 	"net"
-	"noone/transport"
+	"noone/app/transport"
 )
 
 type ctx struct {

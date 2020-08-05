@@ -1,32 +1,32 @@
 package udp
 
 import (
-	"github.com/kataras/golog"
+	"github.com/sirupsen/logrus"
 	"net"
-	"noone/crypto/aes"
-	"noone/transport"
-	"noone/user"
+	"noone/app/crypto/aes"
+	"noone/app/transport"
+	"noone/app/user"
 	"strconv"
 )
 
 func Run(userInfo *user.User) {
 	udpAddr, err := net.ResolveUDPAddr("udp", userInfo.Server+":"+strconv.Itoa(userInfo.Port))
 	if err != nil {
-		golog.Fatal(err)
+		logrus.Fatal(err)
 	}
 	lClient, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		golog.Fatal(err)
+		logrus.Fatal(err)
 	}
 	clientBuf := make([]byte, clientBufCapacity)
 	for {
 		clientReadN, clientAddr, err := lClient.ReadFrom(clientBuf)
 		if err != nil {
-			golog.Error(err)
+			logrus.Error(err)
 			continue
 		}
 		if clientReadN < aes.IvLen+7 {
-			golog.Error("头部长度不合法")
+			logrus.Error("头部长度不合法")
 			continue
 		}
 		c := &ctx{
@@ -38,32 +38,32 @@ func Run(userInfo *user.User) {
 			},
 			lClient: lClient,
 		}
-		golog.Info("UDP readfrom " + c.ClientAddr.String())
+		logrus.Info("UDP readfrom " + c.ClientAddr.String())
 
 		copy(clientBuf, clientBuf[aes.IvLen:clientReadN])
 		clientReadN -= aes.IvLen
 		c.Decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
 		offset, err := c.ParseHeader(clientBuf[:clientReadN])
 		if err != nil {
-			golog.Error(err)
+			logrus.Error(err)
 			continue
 		}
 		clientReadN -= offset
 		if clientReadN <= 0 {
-			golog.Error("udp没有数据")
+			logrus.Error("udp没有数据")
 			continue
 		}
 
 		// 绑定随机地址
 		c.lRemote, err = net.ListenUDP("udp", nil)
 		if err != nil {
-			golog.Error(err)
+			logrus.Error(err)
 			continue
 		}
-		golog.Info("UDP sendto " + c.RemoteAddr.String())
+		logrus.Info("UDP sendto " + c.RemoteAddr.String())
 		_, err = c.lRemote.WriteTo(clientBuf[offset:clientReadN+offset], c.RemoteAddr)
 		if err != nil {
-			golog.Error(err)
+			logrus.Error(err)
 			continue
 		}
 

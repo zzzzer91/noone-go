@@ -1,9 +1,9 @@
 package user
 
 import (
-	"noone/conf"
-	"noone/crypto"
-	"noone/dnscache"
+	"noone/app/conf"
+	"noone/app/crypto"
+	"noone/app/dnscache"
 	"sync"
 )
 

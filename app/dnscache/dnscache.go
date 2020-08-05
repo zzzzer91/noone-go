@@ -3,7 +3,7 @@
 package dnscache
 
 import (
-	"github.com/kataras/golog"
+	"github.com/sirupsen/logrus"
 	"net"
 	"sync"
 )
@@ -66,7 +66,7 @@ func (c *Cache) Clear() {
 
 func (c *Cache) LookupIP(host string) ([]net.IP, error) {
 	if v := c.get(host); v != nil {
-		golog.Debug(host + " cache hit")
+		logrus.Debug(host + " cache hit")
 		return v, nil
 	}
 	ips, err := net.LookupIP(host)

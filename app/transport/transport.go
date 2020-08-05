@@ -3,8 +3,8 @@ package transport
 import (
 	"errors"
 	"net"
-	"noone/crypto"
-	"noone/user"
+	"noone/app/crypto"
+	"noone/app/user"
 )
 
 const (

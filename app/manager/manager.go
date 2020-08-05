@@ -1,7 +1,7 @@
 package manager
 
 import (
-	"noone/user"
+	"noone/app/user"
 	"sync"
 )
 

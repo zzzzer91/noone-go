@@ -2,10 +2,10 @@ package tcp
 
 import (
 	"errors"
-	"github.com/kataras/golog"
+	"github.com/sirupsen/logrus"
 	"net"
-	"noone/crypto/aes"
-	"noone/transport"
+	"noone/app/crypto/aes"
+	"noone/app/transport"
 	"strconv"
 )
 
@@ -105,7 +105,7 @@ func (c *ctx) readRemote() error {
 }
 
 func (c *ctx) writeClient() error {
-	// golog.Debug("writeClient: " + strconv.Itoa(c.remoteBufLen))
+	// logrus.Debug("writeClient: " + strconv.Itoa(c.remoteBufLen))
 
 	// 发送缓冲区可能满，这个时候要不停写，直到写完
 	for c.remoteBufLen > 0 {
@@ -141,7 +141,7 @@ func (c *ctx) handleStageHandShake() error {
 	} else {
 		temp = c.RemoteAddr.String()
 	}
-	golog.Info("Connecting " + temp)
+	logrus.Info("Connecting " + temp)
 	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
 	if err != nil {
 		// 这个 Domain 对应的 IP 已经过期，把它从缓存删除
@@ -156,7 +156,7 @@ func (c *ctx) handleStageHandShake() error {
 	if err != nil {
 		return err
 	}
-	golog.Info("Connected " + temp)
+	logrus.Info("Connected " + temp)
 	c.Stage = transport.StageStream
 	return nil
 }

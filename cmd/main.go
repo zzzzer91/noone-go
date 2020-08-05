@@ -3,12 +3,12 @@ package main
 import (
 	"errors"
 	"flag"
-	"github.com/kataras/golog"
-	"noone/conf"
-	"noone/manager"
-	"noone/transport/tcp"
-	"noone/transport/udp"
-	"noone/user"
+	"github.com/sirupsen/logrus"
+	"noone/app/conf"
+	"noone/app/manager"
+	"noone/app/transport/tcp"
+	"noone/app/transport/udp"
+	"noone/app/user"
 	"os"
 	"os/signal"
 	"strconv"
@@ -30,17 +30,21 @@ func runOne(u *user.User) error {
 func main() {
 	var flags struct {
 		confPath string
-		logLevel string
+		logLevel int
 	}
 	flag.StringVar(&flags.confPath, "c", "config.json", "config file path")
-	flag.StringVar(&flags.logLevel, "l", "info", "log level")
+	flag.IntVar(&flags.logLevel, "l", int(logrus.InfoLevel), "log level")
 	flag.Parse()
 
 	ssConf, err := conf.LoadJson(flags.confPath)
 	if err != nil {
-		golog.Fatal(err)
+		logrus.Fatal(err)
 	}
-	golog.SetLevel(flags.logLevel)
+
+	customFormatter := new(logrus.TextFormatter)
+	customFormatter.FullTimestamp = true
+	logrus.SetFormatter(customFormatter)
+	logrus.SetLevel(logrus.Level(flags.logLevel))
 
 	manager.M.Users = user.InitUsers(ssConf)
 	manager.M.TcpCtxPool = &sync.Pool{
@@ -51,7 +55,7 @@ func main() {
 
 	for _, u := range manager.M.Users {
 		if err := runOne(u); err != nil {
-			golog.Fatal(err)
+			logrus.Fatal(err)
 		}
 	}
 
@@ -59,14 +63,14 @@ func main() {
 		t := time.NewTicker(5 * time.Minute)
 		defer t.Stop()
 		for range t.C {
-			golog.Debug("Clear the expired DNS caches regularly")
+			logrus.Debug("Clear the expired DNS caches regularly")
 			for _, u := range manager.M.Users {
 				u.DnsCache.Clear()
 			}
 		}
 	}()
 
-	golog.Info("Noone started")
+	logrus.Info("Noone started")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

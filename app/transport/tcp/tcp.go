@@ -1,32 +1,32 @@
 package tcp
 
 import (
-	"github.com/kataras/golog"
+	"github.com/sirupsen/logrus"
 	"io"
 	"net"
-	"noone/manager"
-	"noone/user"
+	"noone/app/manager"
+	"noone/app/user"
 	"strconv"
 )
 
 func Run(userInfo *user.User) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", userInfo.Server+":"+strconv.Itoa(userInfo.Port))
 	if err != nil {
-		golog.Fatal(err)
+		logrus.Fatal(err)
 	}
 	l, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		golog.Fatal(err)
+		logrus.Fatal(err)
 	}
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
-			golog.Error(err)
+			logrus.Error(err)
 			continue
 		}
 
 		if err := conn.SetKeepAlive(true); err != nil {
-			golog.Error(err)
+			logrus.Error(err)
 			return
 		}
 		c := manager.M.TcpCtxPool.Get().(*ctx)
@@ -42,13 +42,13 @@ func handle(c *ctx) {
 	defer manager.M.TcpCtxPool.Put(c)
 	defer c.reset()
 
-	golog.Debug("TCP accept " + c.ClientAddr.String())
+	logrus.Debug("TCP accept " + c.ClientAddr.String())
 	if err := c.handleStageInit(); err != nil {
-		golog.Error(err)
+		logrus.Error(err)
 		return
 	}
 	if err := c.handleStageHandShake(); err != nil {
-		golog.Error(err)
+		logrus.Error(err)
 		return
 	}
 	if err := c.handleStageStream(); err != nil {
@@ -56,7 +56,7 @@ func handle(c *ctx) {
 		if err == io.EOF {
 			return
 		}
-		golog.Error(err)
+		logrus.Error(err)
 		return
 	}
 }
