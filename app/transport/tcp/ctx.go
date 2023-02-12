@@ -2,11 +2,12 @@ package tcp
 
 import (
 	"errors"
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"net"
 	"noone/app/crypto/aes"
 	"noone/app/transport"
-	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
 type ctx struct {
@@ -123,6 +124,9 @@ func (c *ctx) handleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
+	if c.clientBufLen == 0 { // 可能第一次只发Decrypter过来
+		return nil
+	}
 	offset, err := c.ParseHeader(c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen])
 	if err != nil {
 		return err
@@ -135,28 +139,23 @@ func (c *ctx) handleStageInit() error {
 }
 
 func (c *ctx) handleStageHandShake() error {
-	var temp string
+	var target string
 	if c.RemoteDomain != "" { // 优先打印域名
-		temp = c.RemoteDomain + ":" + strconv.Itoa(c.RemotePort)
+		target = fmt.Sprintf("%s (%s)", c.RemoteDomain, c.RemoteAddr.String())
 	} else {
-		temp = c.RemoteAddr.String()
+		target = c.RemoteAddr.String()
 	}
-	logrus.Info("Connecting " + temp)
+	logrus.Info("Connecting " + target)
 	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
 	if err != nil {
-		// 这个 Domain 对应的 IP 已经过期，把它从缓存删除
-		// TODO，当访问被墙域名时，会不停的加入缓存和从缓存删除
-		//if c.RemoteDomain != "" {
-		//	c.UserInfo.DnsCache.Del(c.RemoteDomain)
-		//}
-		return errors.New("Connect " + temp + " error: " + err.Error())
+		return errors.New("Connect " + target + " error: " + err.Error())
 	}
 	c.remoteConn = conn
 	err = c.remoteConn.SetKeepAlive(true)
 	if err != nil {
 		return err
 	}
-	logrus.Info("Connected " + temp)
+	logrus.Info("Connected " + target)
 	c.Stage = transport.StageStream
 	return nil
 }

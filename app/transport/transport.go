@@ -47,8 +47,8 @@ func (c *Ctx) Reset() {
 }
 
 func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
-	// 7 是头部可能最小长度（AtypIpv4 时）
-	if len(buf) < 7 {
+	// 头部可能最小长度（AtypIpv6 时）
+	if len(buf) < 19 {
 		return 0, errors.New("header长度不合法")
 	}
 	var ip net.IP
@@ -62,12 +62,9 @@ func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
 			return 0, errors.New("域名长度不合法")
 		}
 		offset += 1
-		// domainLen 长度要检查，不然会被爆内存
-		domainBytes := make([]byte, domainLen)
-		copy(domainBytes, buf[offset:])
-		offset += domainLen
 		// 解析IP
-		c.RemoteDomain = string(domainBytes)
+		c.RemoteDomain = string(buf[offset : domainLen+offset])
+		offset += domainLen
 		ips, err := manager.M.DnsCache.LookupIP(c.RemoteDomain)
 		if err != nil {
 			manager.M.DnsCache.Del(c.RemoteDomain)

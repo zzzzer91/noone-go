@@ -1,12 +1,14 @@
 package tcp
 
 import (
-	"github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"noone/app/manager"
+	"noone/app/transport"
 	"noone/app/user"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
 func Run(userInfo *user.User) {
@@ -43,20 +45,29 @@ func handle(c *ctx) {
 	defer c.reset()
 
 	logrus.Debug("TCP accept " + c.ClientAddr.String())
-	if err := c.handleStageInit(); err != nil {
-		logrus.Error(err)
-		return
-	}
-	if err := c.handleStageHandShake(); err != nil {
-		logrus.Error(err)
-		return
-	}
-	if err := c.handleStageStream(); err != nil {
-		// 对端关闭，忽略
-		if err == io.EOF {
+
+	if c.Stage == transport.StageInit {
+		if err := c.handleStageInit(); err != nil {
+			logrus.Error(err)
 			return
 		}
-		logrus.Error(err)
-		return
+	}
+
+	if c.Stage == transport.StageHandShake {
+		if err := c.handleStageHandShake(); err != nil {
+			logrus.Error(err)
+			return
+		}
+	}
+
+	if c.Stage == transport.StageStream {
+		if err := c.handleStageStream(); err != nil {
+			// 对端关闭，忽略
+			if err == io.EOF {
+				return
+			}
+			logrus.Error(err)
+			return
+		}
 	}
 }
