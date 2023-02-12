@@ -12,11 +12,11 @@ $ ./compile.sh
 
 ```bash
 $ cd bin
-$ noone -c config.json
+$ ./noone -c config.json
 ```
 
 Or run Noone in the background:
 
 ```bash
-$ nohup noone -c config.json 2>&1 > noone.log &
+$ nohup ./noone -c config.json 2>&1 > noone.log &
 ```
