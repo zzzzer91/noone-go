@@ -1,8 +1,7 @@
 module noone
 
-go 1.13
+go 1.19
 
-require (
-	github.com/sirupsen/logrus v1.6.0
-	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5 // indirect
-)
+require github.com/sirupsen/logrus v1.9.0
+
+require golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
