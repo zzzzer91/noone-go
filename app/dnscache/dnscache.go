@@ -58,6 +58,12 @@ func (c *Cache) LookupIP(host string) ([]net.IP, error) {
 	return e.ips, e.err
 }
 
+func (c *Cache) Del(key string) {
+	c.lock.Lock()
+	delete(c.dict, key)
+	c.lock.Unlock()
+}
+
 func (c *Cache) initCleanTask() {
 	go func() {
 		t := time.NewTicker(1 * time.Minute)

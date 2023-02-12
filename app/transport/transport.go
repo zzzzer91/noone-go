@@ -70,6 +70,7 @@ func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
 		c.RemoteDomain = string(domainBytes)
 		ips, err := manager.M.DnsCache.LookupIP(c.RemoteDomain)
 		if err != nil {
+			manager.M.DnsCache.Del(c.RemoteDomain)
 			return 0, err
 		}
 		// 暂时先选取第一个 IP
