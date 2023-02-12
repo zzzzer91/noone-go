@@ -3,6 +3,7 @@ package tcp
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"noone/app/crypto/aes"
 	"noone/app/transport"
@@ -166,28 +167,35 @@ func (c *ctx) handleStageStream() error {
 	go func(c *ctx) {
 		for {
 			if err := c.readRemote(); err != nil {
+				if err != io.EOF {
+					logrus.Error("readRemote err: " + err.Error())
+				}
 				break
 			}
 			if err := c.writeClient(); err != nil {
+				logrus.Error("writeClient err: " + err.Error())
 				break
 			}
 		}
-		_ = c.clientConn.Close()
-		_ = c.remoteConn.Close()
+		_ = c.clientConn.CloseWrite()
 		done <- true
 	}(c)
 
 	for {
 		if err := c.writeRemote(); err != nil {
+			logrus.Error("writeRemote err: " + err.Error())
 			break
 		}
 		if err := c.readClient(); err != nil {
+			if err != io.EOF {
+				logrus.Error("readClient err: " + err.Error())
+			}
 			break
 		}
 	}
-	_ = c.clientConn.Close()
-	_ = c.remoteConn.Close()
+	_ = c.remoteConn.CloseWrite()
 	<-done
+	logrus.Debug("tunnel closed")
 	c.Stage = transport.StageDestroyed
 	// 暂时忽略 stream 阶段出现的错误
 	return nil
