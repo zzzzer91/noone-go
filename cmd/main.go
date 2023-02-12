@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -41,6 +40,9 @@ func main() {
 	logrus.SetFormatter(customFormatter)
 	logrus.SetLevel(logrus.Level(flags.logLevel))
 
+	pwd, _ := os.Getwd()
+	logrus.Debugf("current pwd is %s", pwd)
+
 	ssConf, err := conf.LoadJson(flags.confPath)
 	if err != nil {
 		logrus.Fatal(err)
@@ -58,17 +60,6 @@ func main() {
 			logrus.Fatal(err)
 		}
 	}
-
-	go func() {
-		t := time.NewTicker(5 * time.Minute)
-		defer t.Stop()
-		for range t.C {
-			logrus.Debug("Clear the expired DNS caches regularly")
-			for _, u := range manager.M.Users {
-				u.DnsCache.Clear()
-			}
-		}
-	}()
 
 	logrus.Info("Noone started")
 

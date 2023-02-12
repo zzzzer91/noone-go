@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"noone/app/crypto"
+	"noone/app/manager"
 	"noone/app/user"
 )
 
@@ -67,7 +68,7 @@ func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
 		offset += domainLen
 		// 解析IP
 		c.RemoteDomain = string(domainBytes)
-		ips, err := c.UserInfo.DnsCache.LookupIP(c.RemoteDomain)
+		ips, err := manager.M.DnsCache.LookupIP(c.RemoteDomain)
 		if err != nil {
 			return 0, err
 		}

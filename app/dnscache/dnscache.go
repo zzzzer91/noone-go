@@ -3,19 +3,25 @@
 package dnscache
 
 import (
-	"github.com/sirupsen/logrus"
+	"context"
 	"net"
 	"sync"
+	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type entry struct {
-	ips     []net.IP
-	refresh bool // 一定时间内使用过则为 true
+	ips       []net.IP
+	err       error
+	refreshed bool // 一定时间内使用过则为 true
+	wg        sync.WaitGroup
 }
 
 type Cache struct {
-	dict map[string]*entry // dict 可能变得很大？
-	lock sync.RWMutex
+	dict               map[string]*entry
+	lock               sync.Mutex
+	isCleanTaskRunning bool
 }
 
 func NewCache() *Cache {
@@ -24,55 +30,56 @@ func NewCache() *Cache {
 	}
 }
 
-func (c *Cache) set(key string, ips []net.IP) {
+func (c *Cache) LookupIP(host string) ([]net.IP, error) {
 	c.lock.Lock()
-	c.dict[key] = &entry{
-		ips:     ips,
-		refresh: false, // 设为 false，接下来一段时间不用，就会被清理
+	if !c.isCleanTaskRunning {
+		c.initCleanTask()
 	}
-	c.lock.Unlock()
-}
 
-func (c *Cache) get(key string) []net.IP {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	v, ok := c.dict[key]
-	if !ok {
-		return nil
+	if e, ok := c.dict[host]; ok {
+		e.refreshed = true
+		c.lock.Unlock()
+		e.wg.Wait()
+		logrus.Debug(host + " cache hit")
+		return e.ips, e.err
 	}
-	// 这里感觉不加写锁没问题？
-	v.refresh = true
-	return v.ips
-}
-
-func (c *Cache) Del(key string) {
-	c.lock.Lock()
-	delete(c.dict, key)
+	logrus.Debug(host + " LookupIP")
+	// 这里设为 true，保证下面执行 LookupIP 时 key 不会被 CleanTask 清理
+	// 因为下面释放锁后，锁可能被 CleanTask 抢到，然后 entry 就会被清理
+	e := &entry{refreshed: true}
+	e.wg.Add(1)
+	c.dict[host] = e
 	c.lock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	e.ips, e.err = net.DefaultResolver.LookupIP(ctx, "ip", host)
+	e.wg.Done()
+	return e.ips, e.err
 }
 
-func (c *Cache) Clear() {
-	temp := make(map[string]*entry, len(c.dict))
+func (c *Cache) initCleanTask() {
+	go func() {
+		t := time.NewTicker(1 * time.Minute)
+		defer t.Stop()
+		for range t.C {
+			c.clear()
+			logrus.Debug("Clear the expired DNS caches regularly")
+		}
+	}()
+	c.isCleanTaskRunning = true
+}
+
+func (c *Cache) clear() {
 	c.lock.Lock()
 	for k, v := range c.dict {
-		if v.refresh {
-			v.refresh = false
-			temp[k] = v
+		if v.refreshed {
+			logrus.Debugf("Set key's refreshed field to false, key: %s", k)
+			v.refreshed = false
+		} else {
+			logrus.Debugf("Clear the expired key: %s", k)
+			delete(c.dict, k)
 		}
 	}
-	c.dict = temp
 	c.lock.Unlock()
-}
-
-func (c *Cache) LookupIP(host string) ([]net.IP, error) {
-	if v := c.get(host); v != nil {
-		logrus.Debug(host + " cache hit")
-		return v, nil
-	}
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return nil, err
-	}
-	c.set(host, ips)
-	return ips, nil
 }
