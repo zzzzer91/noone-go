@@ -47,8 +47,8 @@ func (c *Ctx) Reset() {
 }
 
 func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
-	// 头部可能最小长度（AtypIpv6 时）
-	if len(buf) < 19 {
+	// 头部可能最小长度（AtypIpv4 时）
+	if len(buf) < 7 {
 		return 0, errors.New("header长度不合法")
 	}
 	var ip net.IP
