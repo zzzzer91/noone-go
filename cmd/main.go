@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"flag"
-	"github.com/sirupsen/logrus"
 	"noone/app/conf"
 	"noone/app/manager"
 	"noone/app/transport/tcp"
@@ -15,6 +14,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func runOne(u *user.User) error {
@@ -36,15 +37,14 @@ func main() {
 	flag.IntVar(&flags.logLevel, "l", int(logrus.InfoLevel), "log level")
 	flag.Parse()
 
+	customFormatter := new(logrus.JSONFormatter)
+	logrus.SetFormatter(customFormatter)
+	logrus.SetLevel(logrus.Level(flags.logLevel))
+
 	ssConf, err := conf.LoadJson(flags.confPath)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-
-	customFormatter := new(logrus.TextFormatter)
-	customFormatter.FullTimestamp = true
-	logrus.SetFormatter(customFormatter)
-	logrus.SetLevel(logrus.Level(flags.logLevel))
 
 	manager.M.Users = user.InitUsers(ssConf)
 	manager.M.TcpCtxPool = &sync.Pool{
