@@ -146,7 +146,7 @@ func (c *ctx) handleStageHandShake() error {
 	} else {
 		target = c.RemoteAddr.String()
 	}
-	logrus.Info("Connecting " + target)
+	logrus.Debug("Connecting " + target)
 	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
 	if err != nil {
 		return errors.New("Connect " + target + " error: " + err.Error())
@@ -156,15 +156,19 @@ func (c *ctx) handleStageHandShake() error {
 	if err != nil {
 		return err
 	}
+	err = c.remoteConn.SetNoDelay(true)
+	if err != nil {
+		return err
+	}
 	logrus.Info("Connected " + target)
 	c.Stage = transport.StageStream
 	return nil
 }
 
 func (c *ctx) handleStageStream() error {
-	done := make(chan bool, 1)
-	defer close(done)
-	go func(c *ctx) {
+	done := make(chan struct{})
+
+	go func() {
 		for {
 			if err := c.readRemote(); err != nil {
 				if err != io.EOF {
@@ -178,8 +182,8 @@ func (c *ctx) handleStageStream() error {
 			}
 		}
 		_ = c.clientConn.CloseWrite()
-		done <- true
-	}(c)
+		close(done)
+	}()
 
 	for {
 		if err := c.writeRemote(); err != nil {
