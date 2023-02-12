@@ -40,10 +40,8 @@ func (c *Cache) LookupIP(host string) ([]net.IP, error) {
 		e.refreshed = true
 		c.lock.Unlock()
 		e.wg.Wait()
-		logrus.Debug(host + " cache hit")
 		return e.ips, e.err
 	}
-	logrus.Debug(host + " LookupIP")
 	// 这里设为 true，保证下面执行 LookupIP 时 key 不会被 CleanTask 清理
 	// 因为下面释放锁后，锁可能被 CleanTask 抢到，然后 entry 就会被清理
 	e := &entry{refreshed: true}
@@ -66,7 +64,7 @@ func (c *Cache) Del(key string) {
 
 func (c *Cache) initCleanTask() {
 	go func() {
-		t := time.NewTicker(1 * time.Minute)
+		t := time.NewTicker(5 * time.Minute)
 		defer t.Stop()
 		for range t.C {
 			c.clear()
@@ -80,10 +78,8 @@ func (c *Cache) clear() {
 	c.lock.Lock()
 	for k, v := range c.dict {
 		if v.refreshed {
-			logrus.Debugf("Set key's refreshed field to false, key: %s", k)
 			v.refreshed = false
 		} else {
-			logrus.Debugf("Clear the expired key: %s", k)
 			delete(c.dict, k)
 		}
 	}
