@@ -58,9 +58,8 @@ func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
 	switch atyp {
 	case AtypDomain:
 		domainLen := int(buf[offset])
-		// 域名长度允许范围
-		if domainLen < 4 || domainLen > 2000 {
-			return 0, errors.New("域名长度不合法")
+		if domainLen < 4 || len(buf[offset:]) < domainLen+2 {
+			return 0, errors.New("域名不合法")
 		}
 		offset += 1
 		// 解析IP
@@ -74,10 +73,16 @@ func (c *Ctx) ParseHeader(buf []byte) (offset int, err error) {
 		// 暂时先选取第一个 IP
 		ip = ips[0]
 	case AtypIpv4:
+		if len(buf[offset:]) < net.IPv4len+2 {
+			return 0, errors.New("Ipv4不合法")
+		}
 		ip = make(net.IP, net.IPv4len)
 		copy(ip, buf[offset:])
 		offset += net.IPv4len
 	case AtypIpv6:
+		if len(buf[offset:]) < net.IPv6len+2 {
+			return 0, errors.New("Ipv6不合法")
+		}
 		ip = make(net.IP, net.IPv6len)
 		copy(ip, buf[offset:])
 		offset += net.IPv6len

@@ -48,7 +48,7 @@ func (c *Cache) LookupIP(host string) ([]net.IP, error) {
 	e.wg.Add(1)
 	c.dict[host] = e
 	c.lock.Unlock()
-
+	logrus.Debug("LookupIP: " + host)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	e.ips, e.err = net.DefaultResolver.LookupIP(ctx, "ip", host)

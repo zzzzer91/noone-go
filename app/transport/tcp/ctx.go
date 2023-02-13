@@ -7,6 +7,7 @@ import (
 	"net"
 	"noone/app/crypto/aes"
 	"noone/app/transport"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -54,33 +55,31 @@ func (c *ctx) readClient() error {
 	if err != nil {
 		return err
 	}
-	c.clientBufLen = n
 	c.clientBufIdx = 0
+	c.clientBufLen = n
 	if c.Decrypter == nil {
 		if n < aes.IvLen {
 			return errors.New("IV length is invaild")
 		}
 		c.Decrypter = aes.NewCtrDecrypter(c.UserInfo.Key, c.clientBuf[:aes.IvLen])
-		c.clientBufLen -= aes.IvLen
 		c.clientBufIdx += aes.IvLen
-		if c.clientBufLen == 0 {
+		if c.clientBufIdx == c.clientBufLen {
 			return nil
 		}
 	}
 	// Decrypt 和 Encrypt 的 dst 和 src 内存区域允许重叠，但是有条件：
 	// 那就是 &dst[0] 和 &src[0] 必须相同
-	tmp := c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen]
+	tmp := c.clientBuf[c.clientBufIdx:c.clientBufLen]
 	c.Decrypter.Decrypt(tmp, tmp)
 	return nil
 }
 
 func (c *ctx) writeRemote() error {
-	for c.clientBufLen > 0 {
-		n, err := c.remoteConn.Write(c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen])
+	for c.clientBufIdx < c.clientBufLen {
+		n, err := c.remoteConn.Write(c.clientBuf[c.clientBufIdx:c.clientBufLen])
 		if err != nil {
 			return err
 		}
-		c.clientBufLen -= n
 		c.clientBufIdx += n
 	}
 	return nil
@@ -100,22 +99,20 @@ func (c *ctx) readRemote() error {
 	if err != nil {
 		return err
 	}
-	c.remoteBufLen = n + offset
 	c.remoteBufIdx = 0
-	c.Encrypter.Encrypt(c.remoteBuf[offset:c.remoteBufLen], c.remoteBuf[offset:c.remoteBufLen])
+	c.remoteBufLen = n + offset
+	tmp := c.remoteBuf[offset:c.remoteBufLen]
+	c.Encrypter.Encrypt(tmp, tmp)
 	return nil
 }
 
 func (c *ctx) writeClient() error {
-	// logrus.Debug("writeClient: " + strconv.Itoa(c.remoteBufLen))
-
 	// 发送缓冲区可能满，这个时候要不停写，直到写完
-	for c.remoteBufLen > 0 {
-		n, err := c.clientConn.Write(c.remoteBuf[c.remoteBufIdx : c.remoteBufIdx+c.remoteBufLen])
+	for c.remoteBufIdx < c.remoteBufLen {
+		n, err := c.clientConn.Write(c.remoteBuf[c.remoteBufIdx:c.remoteBufLen])
 		if err != nil {
 			return err
 		}
-		c.remoteBufLen -= n
 		c.remoteBufIdx += n
 	}
 	return nil
@@ -125,14 +122,15 @@ func (c *ctx) handleStageInit() error {
 	if err := c.readClient(); err != nil {
 		return err
 	}
-	if c.clientBufLen == 0 { // 可能第一次只发Decrypter过来
-		return nil
+	if c.clientBufIdx == c.clientBufLen { // 可能第一次只发了Decrypter过来，这时要再读一次读到header
+		if err := c.readClient(); err != nil {
+			return err
+		}
 	}
-	offset, err := c.ParseHeader(c.clientBuf[c.clientBufIdx : c.clientBufIdx+c.clientBufLen])
+	offset, err := c.ParseHeader(c.clientBuf[c.clientBufIdx:c.clientBufLen])
 	if err != nil {
 		return err
 	}
-	c.clientBufLen -= offset
 	c.clientBufIdx += offset
 
 	if c.RemoteDomain != "" {
@@ -147,11 +145,11 @@ func (c *ctx) handleStageInit() error {
 
 func (c *ctx) handleStageHandShake() error {
 	logrus.Debug("Connecting " + c.Info)
-	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
+	conn, err := net.DialTimeout("tcp", c.RemoteAddr.(*net.TCPAddr).String(), time.Second*5)
 	if err != nil {
 		return errors.New("Connect " + c.Info + " error: " + err.Error())
 	}
-	c.remoteConn = conn
+	c.remoteConn = conn.(*net.TCPConn)
 	err = c.remoteConn.SetKeepAlive(true)
 	if err != nil {
 		return err
@@ -195,7 +193,7 @@ func (c *ctx) handleStageStream() error {
 	}
 	_ = c.remoteConn.CloseWrite()
 	<-done
-	logrus.Debug("tunnel closed")
+	logrus.Debug(c.Info + " tunnel closed")
 	c.Stage = transport.StageDestroyed
 	// 暂时忽略 stream 阶段出现的错误
 	return nil

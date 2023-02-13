@@ -4,7 +4,6 @@ import (
 	"io"
 	"net"
 	"noone/app/manager"
-	"noone/app/transport"
 	"noone/app/user"
 	"strconv"
 
@@ -46,28 +45,22 @@ func handle(c *ctx) {
 
 	logrus.Debug("TCP accept " + c.ClientAddr.String())
 
-	if c.Stage == transport.StageInit {
-		if err := c.handleStageInit(); err != nil {
-			logrus.Error(err)
-			return
-		}
+	if err := c.handleStageInit(); err != nil {
+		logrus.Error(err)
+		return
 	}
 
-	if c.Stage == transport.StageHandShake {
-		if err := c.handleStageHandShake(); err != nil {
-			logrus.Error(err)
-			return
-		}
+	if err := c.handleStageHandShake(); err != nil {
+		logrus.Error(err)
+		return
 	}
 
-	if c.Stage == transport.StageStream {
-		if err := c.handleStageStream(); err != nil {
-			// 对端关闭，忽略
-			if err == io.EOF {
-				return
-			}
-			logrus.Error(err)
+	if err := c.handleStageStream(); err != nil {
+		// 对端关闭，忽略
+		if err == io.EOF {
 			return
 		}
+		logrus.Error(err)
+		return
 	}
 }
