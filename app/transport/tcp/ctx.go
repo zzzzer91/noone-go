@@ -135,32 +135,28 @@ func (c *ctx) handleStageInit() error {
 	c.clientBufLen -= offset
 	c.clientBufIdx += offset
 
+	if c.RemoteDomain != "" {
+		c.Info = fmt.Sprintf("%s:%d (%s)", c.RemoteDomain, c.RemotePort, c.RemoteAddr.String())
+	} else {
+		c.Info = c.RemoteAddr.String()
+	}
+
 	c.Stage = transport.StageHandShake
 	return nil
 }
 
 func (c *ctx) handleStageHandShake() error {
-	var target string
-	if c.RemoteDomain != "" { // 优先打印域名
-		target = fmt.Sprintf("%s (%s)", c.RemoteDomain, c.RemoteAddr.String())
-	} else {
-		target = c.RemoteAddr.String()
-	}
-	logrus.Debug("Connecting " + target)
+	logrus.Debug("Connecting " + c.Info)
 	conn, err := net.DialTCP("tcp", nil, c.RemoteAddr.(*net.TCPAddr))
 	if err != nil {
-		return errors.New("Connect " + target + " error: " + err.Error())
+		return errors.New("Connect " + c.Info + " error: " + err.Error())
 	}
 	c.remoteConn = conn
 	err = c.remoteConn.SetKeepAlive(true)
 	if err != nil {
 		return err
 	}
-	err = c.remoteConn.SetNoDelay(true)
-	if err != nil {
-		return err
-	}
-	logrus.Info("Connected " + target)
+	logrus.Info("Connected " + c.Info)
 	c.Stage = transport.StageStream
 	return nil
 }
@@ -172,12 +168,12 @@ func (c *ctx) handleStageStream() error {
 		for {
 			if err := c.readRemote(); err != nil {
 				if err != io.EOF {
-					logrus.Error("readRemote err: " + err.Error())
+					logrus.Error(c.Info + " readRemote err: " + err.Error())
 				}
 				break
 			}
 			if err := c.writeClient(); err != nil {
-				logrus.Error("writeClient err: " + err.Error())
+				logrus.Error(c.Info + " writeClient err: " + err.Error())
 				break
 			}
 		}
@@ -187,12 +183,12 @@ func (c *ctx) handleStageStream() error {
 
 	for {
 		if err := c.writeRemote(); err != nil {
-			logrus.Error("writeRemote err: " + err.Error())
+			logrus.Error(c.Info + " writeRemote err: " + err.Error())
 			break
 		}
 		if err := c.readClient(); err != nil {
 			if err != io.EOF {
-				logrus.Error("readClient err: " + err.Error())
+				logrus.Error(c.Info + " readClient err: " + err.Error())
 			}
 			break
 		}

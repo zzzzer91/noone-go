@@ -27,6 +27,7 @@ type Ctx struct {
 	Stage        int
 	RemoteDomain string
 	RemotePort   int
+	Info         string
 	ClientAddr   net.Addr
 	RemoteAddr   net.Addr
 	Encrypter    crypto.Encrypter
