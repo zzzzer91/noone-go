@@ -63,6 +63,7 @@ func (c *Cache) Del(key string) {
 }
 
 func (c *Cache) initCleanTask() {
+	c.isCleanTaskRunning = true
 	go func() {
 		t := time.NewTicker(5 * time.Minute)
 		defer t.Stop()
@@ -71,7 +72,6 @@ func (c *Cache) initCleanTask() {
 			logrus.Debug("Clear the expired DNS caches regularly")
 		}
 	}()
-	c.isCleanTaskRunning = true
 }
 
 func (c *Cache) clear() {

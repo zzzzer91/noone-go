@@ -8,7 +8,6 @@ import (
 
 func TestDnsCache(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
-	// 不要调用 `cache.get()` 获取缓存，`get()` 中有刷新条目逻辑
 	cache := NewCache()
 
 	host := "www.baidu.com"
@@ -56,4 +55,21 @@ func TestDnsCache(t *testing.T) {
 	if len(cache.dict) != 0 {
 		t.Fatal("clear error")
 	}
+}
+
+func BenchmarkDnsCache(b *testing.B) {
+	cache := NewCache()
+	host := "www.baidu.com"
+	_, err := cache.LookupIP(host)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := cache.LookupIP(host)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
