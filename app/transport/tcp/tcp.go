@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"io"
 	"net"
 	"noone/app/manager"
 	"noone/app/user"
@@ -25,11 +24,11 @@ func Run(userInfo *user.User) {
 			logrus.Error(err)
 			continue
 		}
-
 		if err := conn.SetKeepAlive(true); err != nil {
 			logrus.Error(err)
 			return
 		}
+
 		c := manager.M.TcpCtxPool.Get().(*ctx)
 		c.ClientAddr = conn.RemoteAddr()
 		c.clientConn = conn
@@ -56,10 +55,6 @@ func handle(c *ctx) {
 	}
 
 	if err := c.handleStageStream(); err != nil {
-		// 对端关闭，忽略
-		if err == io.EOF {
-			return
-		}
 		logrus.Error(err)
 		return
 	}

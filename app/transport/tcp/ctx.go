@@ -195,6 +195,5 @@ func (c *ctx) handleStageStream() error {
 	<-done
 	logrus.Debug(c.Info + " tunnel closed")
 	c.Stage = transport.StageDestroyed
-	// 暂时忽略 stream 阶段出现的错误
 	return nil
 }
