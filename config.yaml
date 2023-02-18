@@ -5,3 +5,11 @@ proxies:
     port: 9527
     password: "123456"
     cipher: "aes-128-ctr"
+  - name: "trojan"
+    type: "trojan"
+    server: "127.0.0.1"
+    port: 9528
+    password: 123456
+    cn: "lucky.me"
+    alpn:
+      - http/1.1

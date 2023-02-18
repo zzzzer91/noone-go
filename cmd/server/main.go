@@ -6,6 +6,7 @@ import (
 	"noone/app/config"
 	"noone/app/manager"
 	"noone/app/transport/ss"
+	"noone/app/transport/trojan"
 	"os"
 	"os/signal"
 	"strconv"
@@ -19,7 +20,14 @@ func runOne(p *config.Proxy) error {
 		return errors.New(strconv.Itoa(p.Port) + " has been used")
 	}
 	manager.M.UsedPorts[p.Port] = struct{}{}
-	ss.Run(p)
+	switch p.Type {
+	case "ss":
+		ss.Run(p)
+	case "trojan":
+		trojan.Run(p)
+	default:
+		return errors.New("proxy type is invalid")
+	}
 	return nil
 }
 

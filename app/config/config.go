@@ -11,12 +11,14 @@ type Conf struct {
 }
 
 type Proxy struct {
-	Name     string `yaml:"name"`
-	Type     string `yaml:"type"`
-	Server   string `yaml:"server"`
-	Port     int    `yaml:"port"`
-	Password string `yaml:"password"`
-	Cipher   string `yaml:"cipher"`
+	Name       string   `yaml:"name"`
+	Type       string   `yaml:"type"`
+	Server     string   `yaml:"server"`
+	Port       int      `yaml:"port"`
+	Password   string   `yaml:"password"`
+	Cipher     string   `yaml:"cipher"`
+	CommonName string   `yaml:"cn"`
+	Alpn       []string `yaml:"alpn"`
 }
 
 func LoadConf(path string) (*Conf, error) {

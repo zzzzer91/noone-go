@@ -1,9 +1,8 @@
-package ss
+package trojan
 
 import (
 	"errors"
 	"net"
-	"noone/app/crypto"
 	"noone/app/manager"
 )
 
@@ -14,9 +13,7 @@ type ssCtx struct {
 	info         string
 	clientAddr   net.Addr
 	remoteAddr   net.Addr
-	encrypter    crypto.Encrypter
-	decrypter    crypto.Decrypter
-	conf         *ssConf
+	conf         *trojanConf
 }
 
 func (c *ssCtx) reset() {
@@ -26,9 +23,6 @@ func (c *ssCtx) reset() {
 	c.info = ""
 	c.clientAddr = nil
 	c.remoteAddr = nil
-	c.encrypter = nil
-	c.decrypter = nil
-	c.conf = nil
 }
 
 func (c *ssCtx) parseHeader(buf []byte) (offset int, err error) {
@@ -90,4 +84,47 @@ func (c *ssCtx) parseHeader(buf []byte) (offset int, err error) {
 	}
 
 	return offset, nil
+}
+
+func (c *tcpCtx) readClient() error {
+	n, err := c.clientConn.Read(c.clientBuf)
+	if err != nil {
+		return err
+	}
+	c.clientBufIdx = 0
+	c.clientBufLen = n
+	return nil
+}
+
+func (c *tcpCtx) writeRemote() error {
+	for c.clientBufIdx < c.clientBufLen {
+		n, err := c.remoteConn.Write(c.clientBuf[c.clientBufIdx:c.clientBufLen])
+		if err != nil {
+			return err
+		}
+		c.clientBufIdx += n
+	}
+	return nil
+}
+
+func (c *tcpCtx) readRemote() error {
+	offset := 0
+	n, err := c.remoteConn.Read(c.remoteBuf[offset:])
+	if err != nil {
+		return err
+	}
+	c.remoteBufIdx = 0
+	c.remoteBufLen = n + offset
+	return nil
+}
+
+func (c *tcpCtx) writeClient() error {
+	for c.remoteBufIdx < c.remoteBufLen {
+		n, err := c.clientConn.Write(c.remoteBuf[c.remoteBufIdx:c.remoteBufLen])
+		if err != nil {
+			return err
+		}
+		c.remoteBufIdx += n
+	}
+	return nil
 }
