@@ -12,7 +12,7 @@ $ ./compile.sh
 
 ```bash
 $ cd bin
-$ ./noone-server -c config.json
+$ ./noone-server -c config.yaml
 ```
 
 Or run Noone in the background:
