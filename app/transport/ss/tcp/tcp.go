@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"net"
-	"noone/app/manager"
 	"noone/app/user"
 	"strconv"
 
@@ -29,7 +28,7 @@ func Run(userInfo *user.User) {
 			return
 		}
 
-		c := manager.M.TcpCtxPool.Get().(*ctx)
+		c := tcpCtxPool.Get().(*ctx)
 		c.ClientAddr = conn.RemoteAddr()
 		c.clientConn = conn
 		c.UserInfo = userInfo
@@ -39,7 +38,7 @@ func Run(userInfo *user.User) {
 }
 
 func handle(c *ctx) {
-	defer manager.M.TcpCtxPool.Put(c)
+	defer tcpCtxPool.Put(c)
 	defer c.reset()
 
 	logrus.Debug("TCP accept " + c.ClientAddr.String())

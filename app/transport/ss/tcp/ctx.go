@@ -6,27 +6,27 @@ import (
 	"io"
 	"net"
 	"noone/app/crypto/aes"
-	"noone/app/transport"
+	"noone/app/transport/ss/common"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 type ctx struct {
-	transport.Ctx
+	common.Ctx
 	clientConn   *net.TCPConn
 	remoteConn   *net.TCPConn
 	clientBuf    []byte
 	clientBufLen int
-	clientBufIdx int // 已用数据偏移
+	clientBufIdx int
 	remoteBuf    []byte
 	remoteBufLen int
 	remoteBufIdx int
 }
 
-func NewCtx() *ctx {
+func newCtx() *ctx {
 	return &ctx{
-		Ctx: transport.Ctx{
+		Ctx: common.Ctx{
 			Network: "tcp",
 		},
 		clientBuf: make([]byte, clientBufCapacity),
@@ -67,8 +67,6 @@ func (c *ctx) readClient() error {
 			return nil
 		}
 	}
-	// Decrypt 和 Encrypt 的 dst 和 src 内存区域允许重叠，但是有条件：
-	// 那就是 &dst[0] 和 &src[0] 必须相同
 	tmp := c.clientBuf[c.clientBufIdx:c.clientBufLen]
 	c.Decrypter.Decrypt(tmp, tmp)
 	return nil
@@ -139,7 +137,6 @@ func (c *ctx) handleStageInit() error {
 		c.Info = c.RemoteAddr.String()
 	}
 
-	c.Stage = transport.StageHandShake
 	return nil
 }
 
@@ -155,7 +152,6 @@ func (c *ctx) handleStageHandShake() error {
 		return err
 	}
 	logrus.Info("Connected " + c.Info)
-	c.Stage = transport.StageStream
 	return nil
 }
 
@@ -194,6 +190,5 @@ func (c *ctx) handleStageStream() error {
 	_ = c.remoteConn.CloseWrite()
 	<-done
 	logrus.Debug(c.Info + " tunnel closed")
-	c.Stage = transport.StageDestroyed
 	return nil
 }

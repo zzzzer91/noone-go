@@ -4,7 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net"
 	"noone/app/crypto/aes"
-	"noone/app/transport"
+	"noone/app/transport/ss/common"
 	"noone/app/user"
 	"strconv"
 )
@@ -30,7 +30,7 @@ func Run(userInfo *user.User) {
 			continue
 		}
 		c := &ctx{
-			Ctx: transport.Ctx{
+			Ctx: common.Ctx{
 				Network:    "udp",
 				UserInfo:   userInfo,
 				ClientAddr: clientAddr,
@@ -95,12 +95,12 @@ func Run(userInfo *user.User) {
 func buildSendClientHeader(buf []byte, remoteAddr *net.UDPAddr) (int, error) {
 	offset := 0
 	if ipv4 := remoteAddr.IP.To4(); ipv4 != nil {
-		buf[offset] = transport.AtypIpv4
+		buf[offset] = common.AtypIpv4
 		offset += 1
 		copy(buf[offset:], ipv4)
 		offset += net.IPv4len
 	} else {
-		buf[offset] = transport.AtypIpv6
+		buf[offset] = common.AtypIpv6
 		offset += 1
 		copy(buf[offset:], remoteAddr.IP)
 		offset += net.IPv6len

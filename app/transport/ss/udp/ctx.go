@@ -2,11 +2,11 @@ package udp
 
 import (
 	"net"
-	"noone/app/transport"
+	"noone/app/transport/ss/common"
 )
 
 type ctx struct {
-	transport.Ctx
+	common.Ctx
 	lClient *net.UDPConn
 	lRemote *net.UDPConn
 }

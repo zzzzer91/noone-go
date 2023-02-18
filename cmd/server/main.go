@@ -5,13 +5,11 @@ import (
 	"flag"
 	"noone/app/conf"
 	"noone/app/manager"
-	"noone/app/transport/tcp"
-	"noone/app/transport/udp"
+	"noone/app/transport/ss"
 	"noone/app/user"
 	"os"
 	"os/signal"
 	"strconv"
-	"sync"
 	"syscall"
 
 	"github.com/sirupsen/logrus"
@@ -22,8 +20,7 @@ func runOne(u *user.User) error {
 		return errors.New(strconv.Itoa(u.Port) + " has been used")
 	}
 	manager.M.UsedPorts[u.Port] = struct{}{}
-	go tcp.Run(u)
-	go udp.Run(u)
+	ss.Run(u)
 	return nil
 }
 
@@ -50,11 +47,6 @@ func main() {
 	}
 
 	manager.M.Users = user.InitUsers(ssConf)
-	manager.M.TcpCtxPool = &sync.Pool{
-		New: func() interface{} {
-			return tcp.NewCtx()
-		},
-	}
 
 	for _, u := range manager.M.Users {
 		if err := runOne(u); err != nil {
