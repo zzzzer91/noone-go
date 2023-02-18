@@ -1,4 +1,4 @@
-package tcp
+package ss
 
 import "sync"
 
@@ -7,7 +7,7 @@ var tcpCtxPool *sync.Pool
 func init() {
 	tcpCtxPool = &sync.Pool{
 		New: func() interface{} {
-			return newCtx()
+			return newTcpCtx()
 		},
 	}
 }

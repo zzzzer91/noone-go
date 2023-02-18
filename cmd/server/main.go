@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func runOne(p *manager.Proxy) error {
+func runOne(p *config.Proxy) error {
 	if _, ok := manager.M.UsedPorts[p.Port]; ok {
 		return errors.New(strconv.Itoa(p.Port) + " has been used")
 	}
@@ -47,8 +47,8 @@ func main() {
 
 	manager.Init(conf)
 
-	for _, u := range manager.M.Proxies {
-		if err := runOne(u); err != nil {
+	for _, p := range conf.Proxies {
+		if err := runOne(p); err != nil {
 			logrus.Fatal(err)
 		}
 	}

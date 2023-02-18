@@ -1,12 +1,9 @@
 package ss
 
-import (
-	"noone/app/manager"
-	"noone/app/transport/ss/tcp"
-	"noone/app/transport/ss/udp"
-)
+import "noone/app/config"
 
-func Run(p *manager.Proxy) {
-	go tcp.Run(p)
-	go udp.Run(p)
+func Run(p *config.Proxy) {
+	conf := convertSsConf(p)
+	go runTcp(conf)
+	go runUdp(conf)
 }

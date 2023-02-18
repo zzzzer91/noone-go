@@ -1,17 +1,21 @@
-package udp
+package ss
 
 import (
 	"net"
 	"noone/app/crypto/aes"
-	"noone/app/manager"
-	"noone/app/transport/ss/common"
 	"strconv"
 
 	"github.com/sirupsen/logrus"
 )
 
-func Run(proxy *manager.Proxy) {
-	udpAddr, err := net.ResolveUDPAddr("udp", proxy.Server+":"+strconv.Itoa(proxy.Port))
+type udpCtx struct {
+	ssCtx
+	lClient *net.UDPConn
+	lRemote *net.UDPConn
+}
+
+func runUdp(conf *ssConf) {
+	udpAddr, err := net.ResolveUDPAddr("udp", conf.server+":"+strconv.Itoa(conf.port))
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -19,7 +23,7 @@ func Run(proxy *manager.Proxy) {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	clientBuf := make([]byte, clientBufCapacity)
+	clientBuf := make([]byte, udpClientBufCapacity)
 	for {
 		clientReadN, clientAddr, err := lClient.ReadFrom(clientBuf)
 		if err != nil {
@@ -27,24 +31,24 @@ func Run(proxy *manager.Proxy) {
 			continue
 		}
 		if clientReadN < aes.IvLen+7 {
-			logrus.Error("头部长度不合法")
+			logrus.Error("header's length is invalid")
 			continue
 		}
-		c := &ctx{
-			Ctx: common.Ctx{
-				Network:    "udp",
-				UserInfo:   proxy,
-				ClientAddr: clientAddr,
-				Decrypter:  aes.NewCtrDecrypter(proxy.Key, clientBuf[:aes.IvLen]),
+		c := &udpCtx{
+			ssCtx: ssCtx{
+				network:    "udp",
+				conf:       conf,
+				clientAddr: clientAddr,
+				decrypter:  aes.NewCtrDecrypter(conf.Key, clientBuf[:aes.IvLen]),
 			},
 			lClient: lClient,
 		}
-		logrus.Info("UDP readfrom " + c.ClientAddr.String())
+		logrus.Info("UDP readfrom " + c.clientAddr.String())
 
 		copy(clientBuf, clientBuf[aes.IvLen:clientReadN])
 		clientReadN -= aes.IvLen
-		c.Decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
-		offset, err := c.ParseHeader(clientBuf[:clientReadN])
+		c.decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
+		offset, err := c.parseHeader(clientBuf[:clientReadN])
 		if err != nil {
 			logrus.Error(err)
 			continue
@@ -61,31 +65,31 @@ func Run(proxy *manager.Proxy) {
 			logrus.Error(err)
 			continue
 		}
-		logrus.Info("UDP sendto " + c.RemoteAddr.String())
-		_, err = c.lRemote.WriteTo(clientBuf[offset:clientReadN+offset], c.RemoteAddr)
+		logrus.Info("UDP sendto " + c.remoteAddr.String())
+		_, err = c.lRemote.WriteTo(clientBuf[offset:clientReadN+offset], c.remoteAddr)
 		if err != nil {
 			logrus.Error(err)
 			continue
 		}
 
-		go func(c *ctx) {
+		go func(c *udpCtx) {
 			defer c.lRemote.Close()
-			remoteBuf := make([]byte, remoteBufCapacity)
+			remoteBuf := make([]byte, udpRemoteBufCapacity)
 			if err := aes.GenRandomIv(remoteBuf[:aes.IvLen]); err != nil {
 				return
 			}
-			offset, err := buildSendClientHeader(remoteBuf[aes.IvLen:], c.RemoteAddr.(*net.UDPAddr))
+			offset, err := buildSendClientHeader(remoteBuf[aes.IvLen:], c.remoteAddr.(*net.UDPAddr))
 			n, addr, err := c.lRemote.ReadFrom(remoteBuf[aes.IvLen+offset:])
 			if err != nil {
 				return
 			}
-			if addr.String() != c.RemoteAddr.String() {
+			if addr.String() != c.remoteAddr.String() {
 				return
 			}
 			n += aes.IvLen + offset
-			c.Encrypter = aes.NewCtrEncrypter(c.UserInfo.Key, remoteBuf[:aes.IvLen])
-			c.Encrypter.Encrypt(remoteBuf[aes.IvLen:n], remoteBuf[aes.IvLen:n])
-			_, err = c.lClient.WriteTo(remoteBuf[:n], c.ClientAddr)
+			c.encrypter = aes.NewCtrEncrypter(c.conf.Key, remoteBuf[:aes.IvLen])
+			c.encrypter.Encrypt(remoteBuf[aes.IvLen:n], remoteBuf[aes.IvLen:n])
+			_, err = c.lClient.WriteTo(remoteBuf[:n], c.clientAddr)
 			if err != nil {
 				return
 			}
@@ -96,12 +100,12 @@ func Run(proxy *manager.Proxy) {
 func buildSendClientHeader(buf []byte, remoteAddr *net.UDPAddr) (int, error) {
 	offset := 0
 	if ipv4 := remoteAddr.IP.To4(); ipv4 != nil {
-		buf[offset] = common.AtypIpv4
+		buf[offset] = atypIpv4
 		offset += 1
 		copy(buf[offset:], ipv4)
 		offset += net.IPv4len
 	} else {
-		buf[offset] = common.AtypIpv6
+		buf[offset] = atypIpv6
 		offset += 1
 		copy(buf[offset:], remoteAddr.IP)
 		offset += net.IPv6len

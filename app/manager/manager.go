@@ -8,7 +8,6 @@ import (
 type Manager struct {
 	UsedPorts map[int]struct{}
 	DnsCache  *dnscache.Cache
-	Proxies   []*Proxy
 }
 
 var M = &Manager{
@@ -20,6 +19,5 @@ func Init(conf *config.Conf) {
 	M = &Manager{
 		UsedPorts: make(map[int]struct{}),
 		DnsCache:  dnscache.NewCache(),
-		Proxies:   initProxies(conf),
 	}
 }

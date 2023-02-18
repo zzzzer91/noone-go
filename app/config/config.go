@@ -7,14 +7,16 @@ import (
 )
 
 type Conf struct {
-	Proxies []struct {
-		Name     string `yaml:"name"`
-		Type     string `yaml:"type"`
-		Server   string `yaml:"server"`
-		Port     int    `yaml:"port"`
-		Password string `yaml:"password"`
-		Cipher   string `yaml:"cipher"`
-	} `yaml:"proxies"`
+	Proxies []*Proxy `yaml:"proxies"`
+}
+
+type Proxy struct {
+	Name     string `yaml:"name"`
+	Type     string `yaml:"type"`
+	Server   string `yaml:"server"`
+	Port     int    `yaml:"port"`
+	Password string `yaml:"password"`
+	Cipher   string `yaml:"cipher"`
 }
 
 func LoadConf(path string) (*Conf, error) {
