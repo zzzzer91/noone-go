@@ -1,0 +1,7 @@
+proxies:
+  - name: "ss"
+    type: "ss"
+    server: "127.0.0.1"
+    port: 9527
+    password: "123456"
+    cipher: "aes-128-ctr"

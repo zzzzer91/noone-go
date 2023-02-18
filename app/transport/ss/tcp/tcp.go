@@ -2,14 +2,14 @@ package tcp
 
 import (
 	"net"
-	"noone/app/user"
+	"noone/app/manager"
 	"strconv"
 
 	"github.com/sirupsen/logrus"
 )
 
-func Run(userInfo *user.User) {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", userInfo.Server+":"+strconv.Itoa(userInfo.Port))
+func Run(proxy *manager.Proxy) {
+	tcpAddr, err := net.ResolveTCPAddr("tcp", proxy.Server+":"+strconv.Itoa(proxy.Port))
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func Run(userInfo *user.User) {
 		c := tcpCtxPool.Get().(*ctx)
 		c.ClientAddr = conn.RemoteAddr()
 		c.clientConn = conn
-		c.UserInfo = userInfo
+		c.UserInfo = proxy
 
 		go handle(c)
 	}

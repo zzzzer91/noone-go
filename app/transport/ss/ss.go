@@ -1,12 +1,12 @@
 package ss
 
 import (
+	"noone/app/manager"
 	"noone/app/transport/ss/tcp"
 	"noone/app/transport/ss/udp"
-	"noone/app/user"
 )
 
-func Run(u *user.User) {
-	go tcp.Run(u)
-	go udp.Run(u)
+func Run(p *manager.Proxy) {
+	go tcp.Run(p)
+	go udp.Run(p)
 }

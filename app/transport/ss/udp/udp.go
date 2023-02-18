@@ -1,16 +1,17 @@
 package udp
 
 import (
-	"github.com/sirupsen/logrus"
 	"net"
 	"noone/app/crypto/aes"
+	"noone/app/manager"
 	"noone/app/transport/ss/common"
-	"noone/app/user"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
-func Run(userInfo *user.User) {
-	udpAddr, err := net.ResolveUDPAddr("udp", userInfo.Server+":"+strconv.Itoa(userInfo.Port))
+func Run(proxy *manager.Proxy) {
+	udpAddr, err := net.ResolveUDPAddr("udp", proxy.Server+":"+strconv.Itoa(proxy.Port))
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -32,9 +33,9 @@ func Run(userInfo *user.User) {
 		c := &ctx{
 			Ctx: common.Ctx{
 				Network:    "udp",
-				UserInfo:   userInfo,
+				UserInfo:   proxy,
 				ClientAddr: clientAddr,
-				Decrypter:  aes.NewCtrDecrypter(userInfo.Key, clientBuf[:aes.IvLen]),
+				Decrypter:  aes.NewCtrDecrypter(proxy.Key, clientBuf[:aes.IvLen]),
 			},
 			lClient: lClient,
 		}

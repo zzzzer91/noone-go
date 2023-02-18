@@ -3,10 +3,9 @@ package main
 import (
 	"errors"
 	"flag"
-	"noone/app/conf"
+	"noone/app/config"
 	"noone/app/manager"
 	"noone/app/transport/ss"
-	"noone/app/user"
 	"os"
 	"os/signal"
 	"strconv"
@@ -15,12 +14,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func runOne(u *user.User) error {
-	if _, ok := manager.M.UsedPorts[u.Port]; ok {
-		return errors.New(strconv.Itoa(u.Port) + " has been used")
+func runOne(p *manager.Proxy) error {
+	if _, ok := manager.M.UsedPorts[p.Port]; ok {
+		return errors.New(strconv.Itoa(p.Port) + " has been used")
 	}
-	manager.M.UsedPorts[u.Port] = struct{}{}
-	ss.Run(u)
+	manager.M.UsedPorts[p.Port] = struct{}{}
+	ss.Run(p)
 	return nil
 }
 
@@ -29,7 +28,7 @@ func main() {
 		confPath string
 		logLevel int
 	}
-	flag.StringVar(&flags.confPath, "c", "config.json", "config file path")
+	flag.StringVar(&flags.confPath, "c", "config.yaml", "config file path")
 	flag.IntVar(&flags.logLevel, "l", int(logrus.InfoLevel), "log level")
 	flag.Parse()
 
@@ -41,14 +40,14 @@ func main() {
 	pwd, _ := os.Getwd()
 	logrus.Debugf("current pwd is %s", pwd)
 
-	ssConf, err := conf.LoadJson(flags.confPath)
+	conf, err := config.LoadConf(flags.confPath)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	manager.M.Users = user.InitUsers(ssConf)
+	manager.Init(conf)
 
-	for _, u := range manager.M.Users {
+	for _, u := range manager.M.Proxies {
 		if err := runOne(u); err != nil {
 			logrus.Fatal(err)
 		}

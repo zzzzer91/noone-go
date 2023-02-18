@@ -5,7 +5,6 @@ import (
 	"net"
 	"noone/app/crypto"
 	"noone/app/manager"
-	"noone/app/user"
 )
 
 // atyp
@@ -24,7 +23,7 @@ type Ctx struct {
 	RemoteAddr   net.Addr
 	Encrypter    crypto.Encrypter
 	Decrypter    crypto.Decrypter
-	UserInfo     *user.User
+	UserInfo     *manager.Proxy
 }
 
 func (c *Ctx) Reset() {
