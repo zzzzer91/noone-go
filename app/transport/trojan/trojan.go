@@ -15,6 +15,10 @@ import (
 
 func Run(p *config.Proxy) {
 	conf := convertTrojanConf(p)
+	go run(conf)
+}
+
+func run(conf *trojanConf) {
 	tlsConf := generateTLSConfig(conf.cn, conf.alpn)
 	l, err := tls.Listen("tcp", conf.addr, tlsConf)
 	if err != nil {
