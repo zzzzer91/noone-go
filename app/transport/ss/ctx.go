@@ -3,35 +3,38 @@ package ss
 import (
 	"errors"
 	"net"
-	"noone/app/crypto"
 	"noone/app/manager"
 )
 
-type ssCtx struct {
-	network      string
-	remoteDomain string
-	remotePort   int
-	info         string
-	clientAddr   net.Addr
-	remoteAddr   net.Addr
-	encrypter    crypto.Encrypter
-	decrypter    crypto.Decrypter
-	conf         *ssConf
+type SsCtx struct {
+	Network      string
+	RemoteDomain string
+	RemotePort   int
+	Info         string
+	ClientAddr   net.Addr
+	RemoteAddr   net.Addr
+	ClientBuf    []byte
+	ClientBufIdx int
+	ClientBufLen int
+	RemoteBuf    []byte
+	RemoteBufIdx int
+	RemoteBufLen int
 }
 
-func (c *ssCtx) reset() {
+func (c *SsCtx) Reset() {
 	// some fields don't need reset, e.g., network
-	c.remoteDomain = ""
-	c.remotePort = 0
-	c.info = ""
-	c.clientAddr = nil
-	c.remoteAddr = nil
-	c.encrypter = nil
-	c.decrypter = nil
-	c.conf = nil
+	c.RemoteDomain = ""
+	c.RemotePort = 0
+	c.Info = ""
+	c.ClientAddr = nil
+	c.RemoteAddr = nil
+	c.ClientBufLen = 0
+	c.ClientBufIdx = 0
+	c.RemoteBufLen = 0
+	c.RemoteBufIdx = 0
 }
 
-func (c *ssCtx) parseHeader(buf []byte) (offset int, err error) {
+func (c *SsCtx) ParseHeader(buf []byte) (offset int, err error) {
 	if len(buf) < 7 {
 		return 0, errors.New("header's length is invalid")
 	}
@@ -45,11 +48,11 @@ func (c *ssCtx) parseHeader(buf []byte) (offset int, err error) {
 			return 0, errors.New("domain is invalid")
 		}
 		offset += 1
-		c.remoteDomain = string(buf[offset : domainLen+offset])
+		c.RemoteDomain = string(buf[offset : domainLen+offset])
 		offset += domainLen
-		ips, err := manager.M.DnsCache.LookupIP(c.remoteDomain)
+		ips, err := manager.M.DnsCache.LookupIP(c.RemoteDomain)
 		if err != nil {
-			manager.M.DnsCache.Del(c.remoteDomain)
+			manager.M.DnsCache.Del(c.RemoteDomain)
 			return 0, err
 		}
 		// select first IP
@@ -71,19 +74,19 @@ func (c *ssCtx) parseHeader(buf []byte) (offset int, err error) {
 	default:
 		return 0, errors.New("atyp is invalid")
 	}
-	c.remotePort = (int(buf[offset]) << 8) | int(buf[offset+1])
+	c.RemotePort = (int(buf[offset]) << 8) | int(buf[offset+1])
 	offset += 2
 
-	switch c.network {
+	switch c.Network {
 	case "tcp":
-		c.remoteAddr = &net.TCPAddr{
+		c.RemoteAddr = &net.TCPAddr{
 			IP:   ip,
-			Port: c.remotePort,
+			Port: c.RemotePort,
 		}
 	case "udp":
-		c.remoteAddr = &net.UDPAddr{
+		c.RemoteAddr = &net.UDPAddr{
 			IP:   ip,
-			Port: c.remotePort,
+			Port: c.RemotePort,
 		}
 	default:
 		return 0, errors.New("network is invalid")

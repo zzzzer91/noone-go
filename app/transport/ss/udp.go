@@ -2,6 +2,7 @@ package ss
 
 import (
 	"net"
+	"noone/app/crypto"
 	"noone/app/crypto/aes"
 	"strconv"
 
@@ -9,9 +10,31 @@ import (
 )
 
 type udpCtx struct {
-	ssCtx
-	lClient *net.UDPConn
-	lRemote *net.UDPConn
+	SsCtx
+	lClient   *net.UDPConn
+	lRemote   *net.UDPConn
+	encrypter crypto.Encrypter
+	decrypter crypto.Decrypter
+	conf      *ssConf
+}
+
+func newUdpCtx() *udpCtx {
+	return &udpCtx{
+		SsCtx: SsCtx{
+			Network:   "udp",
+			ClientBuf: make([]byte, udpClientBufCapacity),
+			RemoteBuf: make([]byte, udpRemoteBufCapacity),
+		},
+	}
+}
+
+func (c *udpCtx) reset() {
+	c.SsCtx.Reset()
+	c.lClient = nil
+	c.lRemote = nil
+	c.encrypter = nil
+	c.decrypter = nil
+	c.conf = nil
 }
 
 func runUdp(conf *ssConf) {
@@ -26,6 +49,7 @@ func runUdp(conf *ssConf) {
 	clientBuf := make([]byte, udpClientBufCapacity)
 	for {
 		clientReadN, clientAddr, err := lClient.ReadFrom(clientBuf)
+		logrus.Info("UDP readfrom " + clientAddr.String())
 		if err != nil {
 			logrus.Error(err)
 			continue
@@ -34,70 +58,71 @@ func runUdp(conf *ssConf) {
 			logrus.Error("header's length is invalid")
 			continue
 		}
-		c := &udpCtx{
-			ssCtx: ssCtx{
-				network:    "udp",
-				conf:       conf,
-				clientAddr: clientAddr,
-				decrypter:  aes.NewCtrDecrypter(conf.Key, clientBuf[:aes.IvLen]),
-			},
-			lClient: lClient,
-		}
-		logrus.Info("UDP readfrom " + c.clientAddr.String())
 
-		copy(clientBuf, clientBuf[aes.IvLen:clientReadN])
-		clientReadN -= aes.IvLen
-		c.decrypter.Decrypt(clientBuf, clientBuf[:clientReadN])
-		offset, err := c.parseHeader(clientBuf[:clientReadN])
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-		clientReadN -= offset
-		if clientReadN <= 0 {
-			logrus.Error("udp没有数据")
-			continue
-		}
+		c := udpCtxPool.Get().(*udpCtx)
+		c.ClientAddr = clientAddr
+		c.decrypter = aes.NewCtrDecrypter(conf.Key, clientBuf[:aes.IvLen])
+		c.lClient = lClient
+		c.decrypter.Decrypt(c.ClientBuf, clientBuf[aes.IvLen:clientReadN])
+		c.ClientBufLen = clientReadN - aes.IvLen
 
-		// 绑定随机地址
-		c.lRemote, err = net.ListenUDP("udp", nil)
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-		logrus.Info("UDP sendto " + c.remoteAddr.String())
-		_, err = c.lRemote.WriteTo(clientBuf[offset:clientReadN+offset], c.remoteAddr)
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-
-		go func(c *udpCtx) {
-			defer c.lRemote.Close()
-			remoteBuf := make([]byte, udpRemoteBufCapacity)
-			if err := aes.GenRandomIv(remoteBuf[:aes.IvLen]); err != nil {
-				return
-			}
-			offset, err := buildSendClientHeader(remoteBuf[aes.IvLen:], c.remoteAddr.(*net.UDPAddr))
-			n, addr, err := c.lRemote.ReadFrom(remoteBuf[aes.IvLen+offset:])
-			if err != nil {
-				return
-			}
-			if addr.String() != c.remoteAddr.String() {
-				return
-			}
-			n += aes.IvLen + offset
-			c.encrypter = aes.NewCtrEncrypter(c.conf.Key, remoteBuf[:aes.IvLen])
-			c.encrypter.Encrypt(remoteBuf[aes.IvLen:n], remoteBuf[aes.IvLen:n])
-			_, err = c.lClient.WriteTo(remoteBuf[:n], c.clientAddr)
-			if err != nil {
-				return
-			}
-		}(c)
+		go handleUdp(c)
 	}
 }
 
-func buildSendClientHeader(buf []byte, remoteAddr *net.UDPAddr) (int, error) {
+func handleUdp(c *udpCtx) {
+	defer udpCtxPool.Put(c)
+	defer c.reset()
+
+	offset, err := c.ParseHeader(c.ClientBuf[:c.ClientBufLen])
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	c.ClientBufIdx += offset
+	if c.ClientBufIdx == c.ClientBufLen {
+		logrus.Error("udp no more data")
+		return
+	}
+
+	// 绑定随机地址
+	c.lRemote, err = net.ListenUDP("udp", nil)
+	defer c.lRemote.Close()
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	logrus.Info("UDP sendto " + c.RemoteAddr.String())
+	_, err = c.lRemote.WriteTo(c.ClientBuf[c.ClientBufIdx:c.ClientBufLen], c.RemoteAddr)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	if err := aes.GenRandomIv(c.RemoteBuf[:aes.IvLen]); err != nil {
+		logrus.Error(err)
+		return
+	}
+	c.encrypter = aes.NewCtrEncrypter(c.conf.Key, c.RemoteBuf[:aes.IvLen])
+	offset = buildSendClientHeader(c.RemoteBuf[aes.IvLen:], c.RemoteAddr.(*net.UDPAddr))
+	n, addr, err := c.lRemote.ReadFrom(c.RemoteBuf[aes.IvLen+offset:])
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	if addr.String() != c.RemoteAddr.String() {
+		logrus.Error("the sent address is not equal to the received address")
+		return
+	}
+	n += aes.IvLen + offset
+	c.encrypter.Encrypt(c.RemoteBuf[aes.IvLen:n], c.RemoteBuf[aes.IvLen:n])
+	_, err = c.lClient.WriteTo(c.RemoteBuf[:n], c.ClientAddr)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+}
+
+func buildSendClientHeader(buf []byte, remoteAddr *net.UDPAddr) int {
 	offset := 0
 	if ipv4 := remoteAddr.IP.To4(); ipv4 != nil {
 		buf[offset] = atypIpv4
@@ -112,5 +137,5 @@ func buildSendClientHeader(buf []byte, remoteAddr *net.UDPAddr) (int, error) {
 	}
 	buf[offset], buf[offset+1] = byte(remoteAddr.Port>>8), byte(remoteAddr.Port)
 	offset += 2
-	return offset, nil
+	return offset
 }
