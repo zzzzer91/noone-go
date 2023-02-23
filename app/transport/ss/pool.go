@@ -10,12 +10,12 @@ var (
 func init() {
 	tcpCtxPool = &sync.Pool{
 		New: func() interface{} {
-			return newTcpCtx()
+			return newSsTcpCtx()
 		},
 	}
 	udpCtxPool = &sync.Pool{
 		New: func() interface{} {
-			return newUdpCtx()
+			return newSsUdpCtx()
 		},
 	}
 }

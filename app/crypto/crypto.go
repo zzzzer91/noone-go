@@ -12,6 +12,14 @@ type Decrypter interface {
 	Decrypt(dst, src []byte)
 }
 
+type EncrypterInPlace interface {
+	EncryptInPlace(data []byte)
+}
+
+type DecrypterInPlace interface {
+	DecryptInPlace(data []byte)
+}
+
 // key-derivation function from original Shadowsocks
 func Kdf(password string, keyLen int) []byte {
 	var b, prev []byte

@@ -20,6 +20,10 @@ func (c *CtrEncryptCtx) Encrypt(dst, src []byte) {
 	c.x.XORKeyStream(dst, src)
 }
 
+func (c *CtrEncryptCtx) EncryptInPlace(data []byte) {
+	c.Encrypt(data, data)
+}
+
 type CtrDecryptCtx struct {
 	x cipher.Stream
 }
@@ -33,4 +37,8 @@ func NewCtrDecrypter(key, iv []byte) *CtrDecryptCtx {
 
 func (c *CtrDecryptCtx) Decrypt(dst, src []byte) {
 	c.x.XORKeyStream(dst, src)
+}
+
+func (c *CtrDecryptCtx) DecryptInPlace(data []byte) {
+	c.Decrypt(data, data)
 }

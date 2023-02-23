@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"noone/app/config"
+	"noone/app/protocol/simplesocks"
+	"noone/app/transport/pure"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -34,103 +36,120 @@ func run(conf *trojanConf) {
 			logrus.Error(err)
 			return
 		}
-		c := tcpCtxPool.Get().(*tcpCtx)
-		c.clientAddr = conn.RemoteAddr()
-		c.clientConn = conn.(*tls.Conn)
+		c := trojanCtxPool.Get().(*trojanCtx)
+		c.ClientAddr = conn.RemoteAddr()
+		c.ClientConn = conn
 		c.conf = conf
 		go handleClientConn(c)
 	}
 }
 
-func handleClientConn(c *tcpCtx) {
-	defer tcpCtxPool.Put(c)
+func handleClientConn(c *trojanCtx) {
+	defer trojanCtxPool.Put(c)
 	defer c.reset()
 
-	logrus.Debug("TCP accept " + c.clientAddr.String())
+	logrus.Debug("TCP accept " + c.ClientAddr.String())
 
-	c.clientBufIdx = 0
-	c.clientBufLen = 0
+	c.ClientBufIdx = 0
+	c.ClientBufLen = 0
 	offset := 0
-	for c.clientBufLen <= 66 {
-		n, err := c.clientConn.Read(c.clientBuf[offset:])
+	for c.ClientBufLen <= 66 {
+		n, err := c.ClientConn.Read(c.ClientBuf[offset:])
 		if err != nil {
 			logrus.Error(err)
 			return
 		}
 		offset += n
-		c.clientBufLen += n
+		c.ClientBufLen += n
 	}
-	if !bytes.Equal(c.clientBuf[:56], c.conf.hexPassword) {
+	if !bytes.Equal(c.ClientBuf[:56], c.conf.hexPassword) {
 		logrus.Error("password not equal")
 		return
 	}
-	c.clientBufIdx += 58
-	cmd := c.clientBuf[c.clientBufIdx]
+	c.ClientBufIdx += 58
+	cmd := c.ClientBuf[c.ClientBufIdx]
 	if cmd != commandTCP && cmd != commandUDP {
 		logrus.Error("cmd is invalid")
 		return
 	}
-	c.clientBufIdx += 1
-	var err error
-	offset, err = c.parseHeader(c.clientBuf[c.clientBufIdx:])
+	c.ClientBufIdx += 1
+	domain, remoteAddr, headerOffset, err := simplesocks.ParseHeader(c.Network, c.ClientBuf[c.ClientBufIdx:])
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
-	c.clientBufIdx += offset + 2
-	if c.remoteDomain != "" {
-		c.info = fmt.Sprintf("%s:%d (%s)", c.remoteDomain, c.remotePort, c.remoteAddr.String())
+	c.ClientBufIdx += headerOffset + 2
+	c.RemoteDomain = domain
+	c.RemoteAddr = remoteAddr
+	if c.RemoteDomain != "" {
+		c.Info = fmt.Sprintf("%s:%d (%s)", c.RemoteDomain, c.RemotePort, c.RemoteAddr.String())
 	} else {
-		c.info = c.remoteAddr.String()
+		c.Info = c.RemoteAddr.String()
 	}
 
-	logrus.Debug("Connecting " + c.info)
-	conn, err := net.DialTimeout("tcp", c.remoteAddr.(*net.TCPAddr).String(), time.Second*5)
+	logrus.Debug("Connecting " + c.Info)
+	conn, err := net.DialTimeout("tcp", c.RemoteAddr.(*net.TCPAddr).String(), time.Second*5)
 	if err != nil {
-		err = errors.New("Connect " + c.info + " error: " + err.Error())
+		err = errors.New("Connect " + c.Info + " error: " + err.Error())
 		logrus.Error(err)
 		return
 	}
-	c.remoteConn = conn.(*net.TCPConn)
-	err = c.remoteConn.SetKeepAlive(true)
+	err = conn.(*net.TCPConn).SetKeepAlive(true)
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
-	logrus.Info("Connected " + c.info)
+	c.RemoteConn = conn
+	logrus.Info("Connected " + c.Info)
 
 	done := make(chan struct{})
 
 	go func() {
 		for {
-			if err := c.readRemote(); err != nil {
+			if err := c.ReadRemote(); err != nil {
 				if err != io.EOF {
-					logrus.Error(c.info + " readRemote err: " + err.Error())
+					logrus.Error(c.Info + " readRemote err: " + err.Error())
 				}
 				break
 			}
-			if err := c.writeClient(); err != nil {
-				logrus.Error(c.info + " writeClient err: " + err.Error())
+			if err := c.WriteClient(); err != nil {
+				logrus.Error(c.Info + " writeClient err: " + err.Error())
 				break
 			}
 		}
-		_ = c.clientConn.CloseWrite()
+		_ = c.ClientConn.(*tls.Conn).CloseWrite()
 		close(done)
 	}()
 
 	for {
-		if err := c.writeRemote(); err != nil {
-			logrus.Error(c.info + " writeRemote err: " + err.Error())
+		if err := c.WriteRemote(); err != nil {
+			logrus.Error(c.Info + " writeRemote err: " + err.Error())
 			break
 		}
-		if err := c.readClient(); err != nil {
+		if err := c.ReadClient(); err != nil {
 			if err != io.EOF {
-				logrus.Error(c.info + " readClient err: " + err.Error())
+				logrus.Error(c.Info + " readClient err: " + err.Error())
 			}
 			break
 		}
 	}
-	_ = c.remoteConn.CloseWrite()
+	_ = c.RemoteConn.(*net.TCPConn).CloseWrite()
 	<-done
-	logrus.Debug(c.info + " tunnel closed")
+	logrus.Debug(c.Info + " tunnel closed")
+}
+
+type trojanCtx struct {
+	*pure.TcpCtx
+	conf *trojanConf
+}
+
+func newTrojanCtx() *trojanCtx {
+	return &trojanCtx{
+		TcpCtx: pure.NewTcpCtx(),
+	}
+}
+
+func (c *trojanCtx) reset() {
+	c.TcpCtx.Reset()
+	c.conf = nil
 }

@@ -2,12 +2,12 @@ package trojan
 
 import "sync"
 
-var tcpCtxPool *sync.Pool
+var trojanCtxPool *sync.Pool
 
 func init() {
-	tcpCtxPool = &sync.Pool{
+	trojanCtxPool = &sync.Pool{
 		New: func() interface{} {
-			return newTcpCtx()
+			return newTrojanCtx()
 		},
 	}
 }
