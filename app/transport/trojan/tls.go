@@ -1,8 +1,9 @@
 package trojan
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -21,10 +22,17 @@ func randInt() *big.Int {
 }
 
 func generateTLSConfig(cn string, alpn []string) *tls.Config {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
 	template := x509.Certificate{
 		SerialNumber: randInt(),
 		Subject:      pkix.Name{CommonName: cn},
@@ -33,7 +41,6 @@ func generateTLSConfig(cn string, alpn []string) *tls.Config {
 	if err != nil {
 		log.Fatal(err)
 	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
 	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
