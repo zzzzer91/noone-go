@@ -8,7 +8,7 @@ proxies:
   - name: "trojan"
     type: "trojan"
     server: "127.0.0.1"
-    port: 9528
+    port: 443
     password: "123456"
     cn: "lucky.me"
     alpn:
