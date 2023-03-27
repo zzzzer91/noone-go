@@ -44,6 +44,7 @@ func main() {
 	customFormatter.TimestampFormat = "2006-01-02T15:04:05.000Z07"
 	logrus.SetFormatter(customFormatter)
 	logrus.SetLevel(logrus.Level(flags.logLevel))
+	logrus.SetReportCaller(true)
 
 	pwd, _ := os.Getwd()
 	logrus.Debugf("current pwd is %s", pwd)
