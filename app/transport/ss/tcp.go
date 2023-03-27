@@ -30,8 +30,9 @@ func runTcp(conf *ssConf) {
 			continue
 		}
 		if err := conn.SetKeepAlive(true); err != nil {
+			conn.Close()
 			logrus.Error(err)
-			return
+			continue
 		}
 
 		c := tcpCtxPool.Get().(*ssTcpCtx)

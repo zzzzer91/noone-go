@@ -33,8 +33,9 @@ func run(conf *trojanConf) {
 			continue
 		}
 		if err := conn.(*tls.Conn).NetConn().(*net.TCPConn).SetKeepAlive(true); err != nil {
+			conn.Close()
 			logrus.Error(err)
-			return
+			continue
 		}
 		c := trojanCtxPool.Get().(*trojanCtx)
 		c.ClientAddr = conn.RemoteAddr()
