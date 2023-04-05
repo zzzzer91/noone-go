@@ -11,7 +11,6 @@ import (
 	"log"
 	"math"
 	"math/big"
-	"time"
 )
 
 func randInt() *big.Int {
@@ -23,7 +22,7 @@ func randInt() *big.Int {
 }
 
 func generateTLSConfig(cn string, alpn []string) *tls.Config {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,12 +33,9 @@ func generateTLSConfig(cn string, alpn []string) *tls.Config {
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 
-	t := time.Now().AddDate(0, -1, 0)
 	template := x509.Certificate{
 		SerialNumber: randInt(),
 		Subject:      pkix.Name{CommonName: cn},
-		NotBefore:    t,
-		NotAfter:     t.AddDate(1, 0, 0),
 	}
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
 	if err != nil {

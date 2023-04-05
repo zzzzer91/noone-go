@@ -48,6 +48,12 @@ func run(conf *trojanConf) {
 func handleClientConn(c *trojanCtx) {
 	defer trojanCtxPool.Put(c)
 	defer c.reset()
+	shouldResponseHttp := false
+	defer func() {
+		if shouldResponseHttp {
+			c.ClientConn.Write([]byte(fallbackHttpBody))
+		}
+	}()
 
 	logrus.Debug("TCP accept " + c.ClientAddr.String())
 
@@ -58,6 +64,7 @@ func handleClientConn(c *trojanCtx) {
 		n, err := c.ClientConn.Read(c.ClientBuf[offset:])
 		if err != nil {
 			logrus.Error(err)
+			shouldResponseHttp = true
 			return
 		}
 		offset += n
@@ -65,6 +72,7 @@ func handleClientConn(c *trojanCtx) {
 	}
 	if !bytes.Equal(c.ClientBuf[:56], c.conf.hexPassword) {
 		logrus.Error("password not equal")
+		shouldResponseHttp = true
 		return
 	}
 	c.ClientBufIdx += 58
