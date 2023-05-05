@@ -7,28 +7,28 @@ import (
 	"noone/app/protocol/simplesocks"
 	"noone/app/transport/pure"
 
-	"github.com/sirupsen/logrus"
+	"github.com/zzzzer91/gopkg/logx"
 )
 
 func runUdp(conf *ssConf) {
 	udpAddr, err := net.ResolveUDPAddr("udp", conf.addr)
 	if err != nil {
-		logrus.Fatal(err)
+		logx.Fatal(err)
 	}
 	lClient, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		logrus.Fatal(err)
+		logx.Fatal(err)
 	}
 	clientBuf := make([]byte, pure.UdpClientBufCapacity)
 	for {
 		clientReadN, clientAddr, err := lClient.ReadFrom(clientBuf)
-		logrus.Info("UDP readfrom " + clientAddr.String())
+		logx.Info("UDP readfrom " + clientAddr.String())
 		if err != nil {
-			logrus.Error(err)
+			logx.Error(err)
 			continue
 		}
 		if clientReadN < aes.IvLen+7 {
-			logrus.Error("header's length is invalid")
+			logx.Error("header's length is invalid")
 			continue
 		}
 
@@ -49,12 +49,12 @@ func handleUdp(c *ssUdpCtx) {
 
 	domain, remoteAddr, offset, err := simplesocks.ParseHeader(c.Network, c.ClientBuf[:c.ClientBufLen])
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	c.ClientBufIdx += offset
 	if c.ClientBufIdx == c.ClientBufLen {
-		logrus.Error("udp no more data")
+		logx.Error("udp no more data")
 		return
 	}
 	c.RemoteDomain = domain
@@ -64,35 +64,35 @@ func handleUdp(c *ssUdpCtx) {
 	c.lRemote, err = net.ListenUDP("udp", nil)
 	defer c.lRemote.Close()
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
-	logrus.Info("UDP sendto " + c.RemoteAddr.String())
+	logx.Info("UDP sendto " + c.RemoteAddr.String())
 	_, err = c.lRemote.WriteTo(c.ClientBuf[c.ClientBufIdx:c.ClientBufLen], c.RemoteAddr)
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	if err := aes.GenRandomIv(c.RemoteBuf[:aes.IvLen]); err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	c.encrypter = aes.NewCtrEncrypter(c.conf.Key, c.RemoteBuf[:aes.IvLen])
 	offset = simplesocks.BuildUdpHeader(c.RemoteBuf[aes.IvLen:], c.RemoteAddr.(*net.UDPAddr))
 	n, addr, err := c.lRemote.ReadFrom(c.RemoteBuf[aes.IvLen+offset:])
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	if addr.String() != c.RemoteAddr.String() {
-		logrus.Error("the sent address is not equal to the received address")
+		logx.Error("the sent address is not equal to the received address")
 		return
 	}
 	n += aes.IvLen + offset
 	c.encrypter.Encrypt(c.RemoteBuf[aes.IvLen:n], c.RemoteBuf[aes.IvLen:n])
 	_, err = c.lClient.WriteTo(c.RemoteBuf[:n], c.ClientAddr)
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 }

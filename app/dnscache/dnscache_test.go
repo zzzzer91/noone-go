@@ -3,11 +3,11 @@ package dnscache
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/zzzzer91/gopkg/logx"
 )
 
 func TestDnsCache(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
+	logx.SetLevel(-1)
 	cache := NewCache()
 
 	host := "www.baidu.com"

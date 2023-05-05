@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/zzzzer91/gopkg/logx"
 )
 
 type entry struct {
@@ -48,7 +48,7 @@ func (c *Cache) LookupIP(host string) ([]net.IP, error) {
 	e.wg.Add(1)
 	c.dict[host] = e
 	c.lock.Unlock()
-	logrus.Debug("LookupIP: " + host)
+	logx.Debug("LookupIP: " + host)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	e.ips, e.err = net.DefaultResolver.LookupIP(ctx, "ip", host)
@@ -69,7 +69,7 @@ func (c *Cache) initCleanTask() {
 		defer t.Stop()
 		for range t.C {
 			c.clear()
-			logrus.Debug("Clear the expired DNS caches regularly")
+			logx.Debug("Clear the expired DNS caches regularly")
 		}
 	}()
 }

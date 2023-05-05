@@ -12,7 +12,7 @@ import (
 	"noone/app/transport/pure"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/zzzzer91/gopkg/logx"
 )
 
 func Run(p *config.Proxy) {
@@ -24,17 +24,17 @@ func run(conf *trojanConf) {
 	tlsConf := generateTLSConfig(conf.cn, conf.alpn)
 	l, err := tls.Listen("tcp", conf.addr, tlsConf)
 	if err != nil {
-		logrus.Fatal(err)
+		logx.Fatal(err)
 	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			logrus.Error(err)
+			logx.Error(err)
 			continue
 		}
 		if err := conn.(*tls.Conn).NetConn().(*net.TCPConn).SetKeepAlive(true); err != nil {
 			conn.Close()
-			logrus.Error(err)
+			logx.Error(err)
 			continue
 		}
 		c := trojanCtxPool.Get().(*trojanCtx)
@@ -55,7 +55,7 @@ func handleClientConn(c *trojanCtx) {
 		}
 	}()
 
-	logrus.Debug("TCP accept " + c.ClientAddr.String())
+	logx.Debug("TCP accept " + c.ClientAddr.String())
 
 	c.ClientBufIdx = 0
 	c.ClientBufLen = 0
@@ -63,7 +63,7 @@ func handleClientConn(c *trojanCtx) {
 	for c.ClientBufLen <= 66 {
 		n, err := c.ClientConn.Read(c.ClientBuf[offset:])
 		if err != nil {
-			logrus.Error(err)
+			logx.Error(err)
 			shouldResponseHttp = true
 			return
 		}
@@ -71,20 +71,20 @@ func handleClientConn(c *trojanCtx) {
 		c.ClientBufLen += n
 	}
 	if !bytes.Equal(c.ClientBuf[:56], c.conf.hexPassword) {
-		logrus.Error("password not equal")
+		logx.Error("password not equal")
 		shouldResponseHttp = true
 		return
 	}
 	c.ClientBufIdx += 58
 	cmd := c.ClientBuf[c.ClientBufIdx]
 	if cmd != commandTCP && cmd != commandUDP {
-		logrus.Error("cmd is invalid")
+		logx.Error("cmd is invalid")
 		return
 	}
 	c.ClientBufIdx += 1
 	domain, remoteAddr, headerOffset, err := simplesocks.ParseHeader(c.Network, c.ClientBuf[c.ClientBufIdx:])
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	c.ClientBufIdx += headerOffset + 2
@@ -96,20 +96,20 @@ func handleClientConn(c *trojanCtx) {
 		c.Info = c.RemoteAddr.String()
 	}
 
-	logrus.Debug("Connecting " + c.Info)
+	logx.Debug("Connecting " + c.Info)
 	conn, err := net.DialTimeout("tcp", c.RemoteAddr.(*net.TCPAddr).String(), time.Second*5)
 	if err != nil {
 		err = errors.New("Connect " + c.Info + " error: " + err.Error())
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	err = conn.(*net.TCPConn).SetKeepAlive(true)
 	if err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 	c.RemoteConn = conn
-	logrus.Info("Connected " + c.Info)
+	logx.Info("Connected " + c.Info)
 
 	done := make(chan struct{})
 
@@ -117,12 +117,12 @@ func handleClientConn(c *trojanCtx) {
 		for {
 			if err := c.ReadRemote(); err != nil {
 				if err != io.EOF {
-					logrus.Error(c.Info + " readRemote err: " + err.Error())
+					logx.Error(c.Info + " readRemote err: " + err.Error())
 				}
 				break
 			}
 			if err := c.WriteClient(); err != nil {
-				logrus.Error(c.Info + " writeClient err: " + err.Error())
+				logx.Error(c.Info + " writeClient err: " + err.Error())
 				break
 			}
 		}
@@ -132,19 +132,19 @@ func handleClientConn(c *trojanCtx) {
 
 	for {
 		if err := c.WriteRemote(); err != nil {
-			logrus.Error(c.Info + " writeRemote err: " + err.Error())
+			logx.Error(c.Info + " writeRemote err: " + err.Error())
 			break
 		}
 		if err := c.ReadClient(); err != nil {
 			if err != io.EOF {
-				logrus.Error(c.Info + " readClient err: " + err.Error())
+				logx.Error(c.Info + " readClient err: " + err.Error())
 			}
 			break
 		}
 	}
 	_ = c.RemoteConn.(*net.TCPConn).CloseWrite()
 	<-done
-	logrus.Debug(c.Info + " tunnel closed")
+	logx.Debug(c.Info + " tunnel closed")
 }
 
 type trojanCtx struct {

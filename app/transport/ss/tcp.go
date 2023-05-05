@@ -11,27 +11,27 @@ import (
 	"noone/app/transport/pure"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/zzzzer91/gopkg/logx"
 )
 
 func runTcp(conf *ssConf) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", conf.addr)
 	if err != nil {
-		logrus.Fatal(err)
+		logx.Fatal(err)
 	}
 	l, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		logrus.Fatal(err)
+		logx.Fatal(err)
 	}
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
-			logrus.Error(err)
+			logx.Error(err)
 			continue
 		}
 		if err := conn.SetKeepAlive(true); err != nil {
 			conn.Close()
-			logrus.Error(err)
+			logx.Error(err)
 			continue
 		}
 
@@ -48,20 +48,20 @@ func handleTcpClientConn(c *ssTcpCtx) {
 	defer tcpCtxPool.Put(c)
 	defer c.reset()
 
-	logrus.Debug("TCP accept " + c.ClientAddr.String())
+	logx.Debug("TCP accept " + c.ClientAddr.String())
 
 	if err := c.handleStageInit(); err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 
 	if err := c.handleStageHandShake(); err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 
 	if err := c.handleStageStream(); err != nil {
-		logrus.Error(err)
+		logx.Error(err)
 		return
 	}
 }
@@ -121,7 +121,7 @@ func (c *ssTcpCtx) handleStageInit() error {
 }
 
 func (c *ssTcpCtx) handleStageHandShake() error {
-	logrus.Debug("Connecting " + c.Info)
+	logx.Debug("Connecting " + c.Info)
 	conn, err := net.DialTimeout("tcp", c.RemoteAddr.(*net.TCPAddr).String(), time.Second*5)
 	if err != nil {
 		return errors.New("Connect " + c.Info + " error: " + err.Error())
@@ -131,7 +131,7 @@ func (c *ssTcpCtx) handleStageHandShake() error {
 		return err
 	}
 	c.RemoteConn = conn
-	logrus.Info("Connected " + c.Info)
+	logx.Info("Connected " + c.Info)
 	return nil
 }
 
@@ -144,7 +144,7 @@ func (c *ssTcpCtx) handleStageStream() error {
 			if c.encrypter == nil {
 				// 随机生成 IV，然后发送给客户端
 				if err := aes.GenRandomIv(c.RemoteBuf[:aes.IvLen]); err != nil {
-					logrus.Error(err)
+					logx.Error(err)
 					return
 				}
 				c.encrypter = aes.NewCtrEncrypter(c.conf.Key, c.RemoteBuf[:aes.IvLen])
@@ -153,13 +153,13 @@ func (c *ssTcpCtx) handleStageStream() error {
 			c.RemoteBufLen += offset
 			if err := c.ReadRemote(); err != nil {
 				if err != io.EOF {
-					logrus.Error(c.Info + " readRemote err: " + err.Error())
+					logx.Error(c.Info + " readRemote err: " + err.Error())
 				}
 				break
 			}
 			c.encrypter.Encrypt(c.RemoteBuf[offset:c.RemoteBufLen], c.RemoteBuf[offset:c.RemoteBufLen])
 			if err := c.WriteClient(); err != nil {
-				logrus.Error(c.Info + " writeClient err: " + err.Error())
+				logx.Error(c.Info + " writeClient err: " + err.Error())
 				break
 			}
 		}
@@ -169,12 +169,12 @@ func (c *ssTcpCtx) handleStageStream() error {
 
 	for {
 		if err := c.WriteRemote(); err != nil {
-			logrus.Error(c.Info + " writeRemote err: " + err.Error())
+			logx.Error(c.Info + " writeRemote err: " + err.Error())
 			break
 		}
 		if err := c.ReadClient(); err != nil {
 			if err != io.EOF {
-				logrus.Error(c.Info + " readClient err: " + err.Error())
+				logx.Error(c.Info + " readClient err: " + err.Error())
 			}
 			break
 		}
@@ -182,6 +182,6 @@ func (c *ssTcpCtx) handleStageStream() error {
 	}
 	_ = c.RemoteConn.(*net.TCPConn).CloseWrite()
 	<-done
-	logrus.Debug(c.Info + " tunnel closed")
+	logx.Debug(c.Info + " tunnel closed")
 	return nil
 }

@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
+	"github.com/zzzzer91/gopkg/logx"
 )
 
 func runOne(p *config.Proxy) error {
@@ -37,32 +37,28 @@ func main() {
 		logLevel int
 	}
 	flag.StringVar(&flags.confPath, "c", "config.yaml", "config file path")
-	flag.IntVar(&flags.logLevel, "l", int(logrus.InfoLevel), "log level")
+	flag.IntVar(&flags.logLevel, "l", 0, "log level, -1 debug, 0 info ...")
 	flag.Parse()
 
-	customFormatter := new(logrus.JSONFormatter)
-	customFormatter.TimestampFormat = "2006-01-02T15:04:05.000Z07"
-	logrus.SetFormatter(customFormatter)
-	logrus.SetLevel(logrus.Level(flags.logLevel))
-	logrus.SetReportCaller(true)
+	logx.SetLevel(flags.logLevel)
 
 	pwd, _ := os.Getwd()
-	logrus.Debugf("current pwd is %s", pwd)
+	logx.Debugf("current pwd is %s", pwd)
 
 	conf, err := config.LoadConf(flags.confPath)
 	if err != nil {
-		logrus.Fatal(err)
+		logx.Fatal(err)
 	}
 
 	manager.Init(conf)
 
 	for _, p := range conf.Proxies {
 		if err := runOne(p); err != nil {
-			logrus.Fatal(err)
+			logx.Fatal(err)
 		}
 	}
 
-	logrus.Info("Noone started")
+	logx.Info("Noone started")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
