@@ -22,7 +22,7 @@ func randInt() *big.Int {
 }
 
 func generateTLSConfig(cn string, alpn []string) *tls.Config {
-	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		log.Fatal(err)
 	}
