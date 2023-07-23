@@ -1,9 +1,9 @@
-module noone
+module github.com/zzzzer91/noone
 
 go 1.20
 
 require (
-	github.com/zzzzer91/gopkg v0.0.0-20230505041801-df9aeca8ee0a
+	github.com/zzzzer91/gopkg v0.0.0-20230723021738-19160fea95bd
 	gopkg.in/yaml.v3 v3.0.1
 )
 

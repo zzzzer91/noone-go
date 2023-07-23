@@ -1,9 +1,10 @@
 package ss
 
 import (
-	"noone/app/config"
-	"noone/app/crypto"
 	"strconv"
+
+	"github.com/zzzzer91/noone/internal/config"
+	"github.com/zzzzer91/noone/internal/crypto"
 )
 
 type ssConf struct {

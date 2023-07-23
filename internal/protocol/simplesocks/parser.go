@@ -3,7 +3,8 @@ package simplesocks
 import (
 	"errors"
 	"net"
-	"noone/app/manager"
+
+	"github.com/zzzzer91/noone/internal/manager"
 )
 
 type Data struct {

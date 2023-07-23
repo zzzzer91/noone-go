@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"noone/app/config"
-	"noone/app/protocol/simplesocks"
-	"noone/app/transport/pure"
 	"time"
+
+	"github.com/zzzzer91/noone/internal/config"
+	"github.com/zzzzer91/noone/internal/protocol/simplesocks"
+	"github.com/zzzzer91/noone/internal/transport/pure"
 
 	"github.com/zzzzer91/gopkg/logx"
 )
@@ -91,7 +92,7 @@ func handleClientConn(c *trojanCtx) {
 	c.RemoteDomain = domain
 	c.RemoteAddr = remoteAddr
 	if c.RemoteDomain != "" {
-		c.Info = fmt.Sprintf("%s:%d (%s)", c.RemoteDomain, c.RemotePort, c.RemoteAddr.String())
+		c.Info = fmt.Sprintf("%s (%s)", c.RemoteDomain, c.RemoteAddr.String())
 	} else {
 		c.Info = c.RemoteAddr.String()
 	}

@@ -2,10 +2,11 @@ package ss
 
 import (
 	"net"
-	"noone/app/crypto"
-	"noone/app/crypto/aes"
-	"noone/app/protocol/simplesocks"
-	"noone/app/transport/pure"
+
+	"github.com/zzzzer91/noone/internal/crypto"
+	"github.com/zzzzer91/noone/internal/crypto/aes"
+	"github.com/zzzzer91/noone/internal/protocol/simplesocks"
+	"github.com/zzzzer91/noone/internal/transport/pure"
 
 	"github.com/zzzzer91/gopkg/logx"
 )

@@ -1,8 +1,8 @@
 package manager
 
 import (
-	"noone/app/config"
-	"noone/app/dnscache"
+	"github.com/zzzzer91/noone/internal/config"
+	"github.com/zzzzer91/noone/internal/dnscache"
 )
 
 type Manager struct {

@@ -1,6 +1,6 @@
 package ss
 
-import "noone/app/config"
+import "github.com/zzzzer91/noone/internal/config"
 
 func Run(p *config.Proxy) {
 	conf := convertSsConf(p)

@@ -3,8 +3,9 @@ package trojan
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"noone/app/config"
 	"strconv"
+
+	"github.com/zzzzer91/noone/internal/config"
 )
 
 type trojanConf struct {

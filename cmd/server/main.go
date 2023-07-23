@@ -3,14 +3,15 @@ package main
 import (
 	"errors"
 	"flag"
-	"noone/app/config"
-	"noone/app/manager"
-	"noone/app/transport/ss"
-	"noone/app/transport/trojan"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+
+	"github.com/zzzzer91/noone/internal/config"
+	"github.com/zzzzer91/noone/internal/manager"
+	"github.com/zzzzer91/noone/internal/transport/ss"
+	"github.com/zzzzer91/noone/internal/transport/trojan"
 
 	"github.com/zzzzer91/gopkg/logx"
 )

@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"noone/app/crypto"
-	"noone/app/crypto/aes"
-	"noone/app/protocol/simplesocks"
-	"noone/app/transport/pure"
 	"time"
+
+	"github.com/zzzzer91/noone/internal/crypto"
+	"github.com/zzzzer91/noone/internal/crypto/aes"
+	"github.com/zzzzer91/noone/internal/protocol/simplesocks"
+	"github.com/zzzzer91/noone/internal/transport/pure"
 
 	"github.com/zzzzer91/gopkg/logx"
 )
@@ -112,7 +113,7 @@ func (c *ssTcpCtx) handleStageInit() error {
 	c.RemoteAddr = remoteAddr
 
 	if c.RemoteDomain != "" {
-		c.Info = fmt.Sprintf("%s:%d (%s)", c.RemoteDomain, c.RemotePort, c.RemoteAddr.String())
+		c.Info = fmt.Sprintf("%s (%s)", c.RemoteDomain, c.RemoteAddr.String())
 	} else {
 		c.Info = c.RemoteAddr.String()
 	}
