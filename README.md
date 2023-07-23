@@ -1,6 +1,6 @@
 # Noone
 
-Another tunnel written in pure Go. Shadowsocks and Trojan support.
+Another tunnel written in pure Go. Trojan protocol support.
 
 ## Build
 

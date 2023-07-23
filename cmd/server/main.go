@@ -10,7 +10,6 @@ import (
 
 	"github.com/zzzzer91/noone/internal/config"
 	"github.com/zzzzer91/noone/internal/manager"
-	"github.com/zzzzer91/noone/internal/transport/ss"
 	"github.com/zzzzer91/noone/internal/transport/trojan"
 
 	"github.com/zzzzer91/gopkg/logx"
@@ -22,8 +21,6 @@ func runOne(p *config.Proxy) error {
 	}
 	manager.M.UsedPorts[p.Port] = struct{}{}
 	switch p.Type {
-	case "ss":
-		ss.Run(p)
 	case "trojan":
 		trojan.Run(p)
 	default:
