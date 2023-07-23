@@ -30,10 +30,11 @@ func ParseHeader(network string, buf []byte) (domain string, addr net.Addr, offs
 		offset += 1
 		domain = string(buf[offset : domainLen+offset])
 		offset += domainLen
-		ips, err := manager.M.DnsCache.LookupIP(domain)
+		var ips []net.IP
+		ips, err = manager.M.DnsCache.LookupIP(domain)
 		if err != nil {
 			manager.M.DnsCache.Del(domain)
-			return "", nil, 0, err
+			return
 		}
 		// select first IP
 		ip = ips[0]
