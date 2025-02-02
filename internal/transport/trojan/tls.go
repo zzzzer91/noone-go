@@ -54,5 +54,6 @@ func generateTLSConfig(cn string, alpn []string) *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsCert},
 		NextProtos:   alpn,
+		MinVersion:   tls.VersionTLS12,
 	}
 }
