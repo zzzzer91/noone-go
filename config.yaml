@@ -1,7 +1,7 @@
 proxies:
   - name: "trojan"
     type: "trojan"
-    server: "127.0.0.1"
+    server: "0.0.0.0"
     port: 9527
     password: "123456"
     cn: "lucky.me"
