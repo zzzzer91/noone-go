@@ -1,0 +1,28 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: debug
+external-controller: 127.0.0.1:7891
+secret: '' # Secret for RESTful API (Optional)
+tun:
+  enable: false # if running on mac, set it to false
+dns:
+  enable: false # if running on mac, set it to false
+proxies:
+  - name: 'trojan-test'
+    type: trojan
+    server: '127.0.0.1'
+    port: 9527
+    password: '123456'
+    alpn:
+      - http/1.1
+    skip-cert-verify: true
+    udp: true
+proxy-groups:
+  - name: Proxy
+    type: select
+    proxies:
+      - trojan-test
+rules:
+  # Other use Proxy
+  - MATCH,Proxy
