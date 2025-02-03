@@ -1,4 +1,4 @@
-package pure
+package trojan
 
 import (
 	"net"
@@ -14,7 +14,7 @@ func NewTCPConn(commonCtx *CommonCtx, conn net.Conn) *TCPConn {
 	return &TCPConn{
 		ctx:     commonCtx,
 		conn:    conn,
-		network: NetworkTypeTCP,
+		network: "tcp",
 	}
 }
 

@@ -1,4 +1,4 @@
-package pure
+package trojan
 
 type Transporter interface {
 	Read() error

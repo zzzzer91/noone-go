@@ -1,15 +1,17 @@
 package simplesocks
 
 import (
+	"encoding/binary"
 	"errors"
 	"net"
 	"strconv"
 
+	"github.com/zzzzer91/gopkg/pool"
 	"github.com/zzzzer91/noone/internal/manager"
 )
 
 //nolint:nakedret
-func ParseHeader(network string, buf []byte) (domain string, addr net.Addr, offset int, err error) {
+func ParseHeader(cmd CmdType, buf []byte) (domain string, addr net.Addr, offset int, err error) {
 	if len(buf) < 7 {
 		err = errors.New("header's length is invalid")
 		return
@@ -58,57 +60,59 @@ func ParseHeader(network string, buf []byte) (domain string, addr net.Addr, offs
 	port := (int(buf[offset]) << 8) | int(buf[offset+1])
 	offset += 2
 
-	switch network {
-	case "tcp":
+	switch cmd {
+	case CmdTypeTCP:
 		addr = &net.TCPAddr{
 			IP:   ip,
 			Port: port,
 		}
-	case "udp":
+	case CmdTypeUDP:
 		addr = &net.UDPAddr{
 			IP:   ip,
 			Port: port,
 		}
 	default:
-		err = errors.New("network is invalid")
+		err = errors.New("cmd is invalid")
 		return
 	}
 
 	return
 }
 
-func BuildHeader(s string) []byte {
-	var addr []byte
-	host, port, err := net.SplitHostPort(s)
+func BuildUDPPacket(addr net.Addr, data []byte) []byte {
+	packet := pool.Get(len(data) + MaxUDPHeaderLength)
+	host, port, err := net.SplitHostPort(addr.String())
 	if err != nil {
 		return nil
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
-			addr = make([]byte, 1+net.IPv4len+2)
-			addr[0] = atypIpv4
-			copy(addr[1:], ip4)
+			packet = packet[:1+net.IPv4len]
+			packet[0] = atypIpv4
+			copy(packet[1:], ip4)
 		} else {
-			addr = make([]byte, 1+net.IPv6len+2)
-			addr[0] = atypIpv6
-			copy(addr[1:], ip)
+			packet = packet[:1+net.IPv6len]
+			packet[0] = atypIpv6
+			copy(packet[1:], ip)
 		}
 	} else {
 		if len(host) > 255 {
 			return nil
 		}
-		addr = make([]byte, 1+1+len(host)+2)
-		addr[0] = atypDomain
-		addr[1] = byte(len(host))
-		copy(addr[2:], host)
+		packet = packet[:1+1+len(host)]
+		packet[0] = atypDomain
+		packet[1] = byte(len(host))
+		copy(packet[2:], host)
 	}
 
 	portnum, err := strconv.ParseUint(port, 10, 16)
 	if err != nil {
 		return nil
 	}
+	packet = binary.BigEndian.AppendUint16(packet, uint16(portnum))
+	packet = binary.BigEndian.AppendUint16(packet, uint16(len(data)))
+	packet = append(packet, Crlf...)
+	packet = append(packet, data...)
 
-	addr[len(addr)-2], addr[len(addr)-1] = byte(portnum>>8), byte(portnum)
-
-	return addr
+	return packet
 }

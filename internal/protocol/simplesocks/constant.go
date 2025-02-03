@@ -1,9 +1,10 @@
 package simplesocks
 
 var (
-	MinBufferLength = 66
-	PasswordLength  = 56
-	Crlf            = "\r\n"
+	MinClientHeaderLength = 66
+	MaxUDPHeaderLength    = 255 + 1 + 1 + 2 + 2 + 2
+	PasswordLength        = 56
+	Crlf                  = "\r\n"
 )
 
 const (

@@ -3,40 +3,39 @@ package trojan
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
+	"github.com/zzzzer91/gopkg/logx"
+	"github.com/zzzzer91/gopkg/pool"
 	"github.com/zzzzer91/noone/internal/config"
 	"github.com/zzzzer91/noone/internal/protocol/simplesocks"
-	"github.com/zzzzer91/noone/internal/transport/pure"
-
-	"github.com/zzzzer91/gopkg/logx"
 )
 
 type trojanCtx struct {
-	*pure.CommonCtx
+	ctx        *CommonCtx
 	conf       *trojanConf
-	ClientConn net.Conn
-	Cmd        simplesocks.CmdType
+	clientConn net.Conn
+	cmd        simplesocks.CmdType
 }
 
 func newTrojanCtx() *trojanCtx {
 	return &trojanCtx{
-		CommonCtx: &pure.CommonCtx{
-			ClientBuf: make([]byte, 63*1024),
-			RemoteBuf: make([]byte, 63*1024),
+		ctx: &CommonCtx{
+			ClientBuf: make([]byte, 16*1024),
+			RemoteBuf: make([]byte, 16*1024),
 		},
 	}
 }
 
 func (c *trojanCtx) reset() {
-	c.CommonCtx.Reset()
+	c.ctx.Reset()
 	c.conf = nil
-	c.Cmd = simplesocks.CmdTypeUnspecified
+	c.cmd = simplesocks.CmdTypeUnspecified
 }
 
 func Run(p *config.Proxy) {
@@ -64,7 +63,7 @@ func run(conf *trojanConf) {
 		}
 		c := trojanCtxPool.Get().(*trojanCtx)
 		c.conf = conf
-		c.ClientConn = conn
+		c.clientConn = conn
 		go handleClientConn(c)
 	}
 }
@@ -75,15 +74,15 @@ func handleClientConn(c *trojanCtx) {
 	shouldResponseHTTP := false
 	defer func() {
 		if shouldResponseHTTP {
-			_, _ = c.ClientConn.Write([]byte(fallbackHTTPBody))
+			_, _ = c.clientConn.Write([]byte(fallbackHTTPBody))
 		}
 	}()
 
-	logx.Debug("TCP accept " + c.ClientConn.RemoteAddr().String())
+	logx.Debug("accept connect: " + c.clientConn.RemoteAddr().String())
 
 	offset := 0
-	for offset <= simplesocks.MinBufferLength {
-		n, err := c.ClientConn.Read(c.ClientBuf[offset:])
+	for offset <= simplesocks.MinClientHeaderLength {
+		n, err := c.clientConn.Read(c.ctx.ClientBuf[offset:])
 		if err != nil {
 			logx.Error(err)
 			shouldResponseHTTP = true
@@ -91,43 +90,42 @@ func handleClientConn(c *trojanCtx) {
 		}
 		offset += n
 	}
-	c.ClientBufLen += offset
-	if !bytes.Equal(c.ClientBuf[:simplesocks.PasswordLength], c.conf.hexPassword) {
+	c.ctx.ClientBufLen += offset
+	if !bytes.Equal(c.ctx.ClientBuf[:simplesocks.PasswordLength], c.conf.hexPassword) {
 		logx.Error("password not equal")
 		shouldResponseHTTP = true
 		return
 	}
-	c.ClientBufIdx += simplesocks.PasswordLength
-	c.ClientBufIdx += len(simplesocks.Crlf)
-	cmd := simplesocks.CmdType(c.ClientBuf[c.ClientBufIdx])
-	c.ClientBufIdx++
+	c.ctx.ClientBufIdx += simplesocks.PasswordLength
+	c.ctx.ClientBufIdx += len(simplesocks.Crlf)
+	cmd := simplesocks.CmdType(c.ctx.ClientBuf[c.ctx.ClientBufIdx])
+	c.ctx.ClientBufIdx++
 	if !cmd.IsValid() {
 		logx.Error("cmd is invalid")
 		return
 	}
-	c.Cmd = cmd
+	c.cmd = cmd
+	domain, remoteAddr, headerOffset, err := simplesocks.ParseHeader(cmd, c.ctx.ClientBuf[c.ctx.ClientBufIdx:])
+	if err != nil {
+		logx.Error(err)
+		return
+	}
+	c.ctx.ClientBufIdx += headerOffset
+	c.ctx.ClientBufIdx += len(simplesocks.Crlf)
+	c.ctx.RemoteDomain = domain
+	c.ctx.RemoteAddr = remoteAddr
+	if c.ctx.RemoteDomain != "" {
+		c.ctx.Info = fmt.Sprintf("[%s] %s (%s)", c.cmd.NetWork(), c.ctx.RemoteDomain, c.ctx.RemoteAddr.String())
+	} else {
+		c.ctx.Info = fmt.Sprintf("[%s] %s", c.cmd.NetWork(), c.ctx.RemoteAddr.String())
+	}
 
-	var t pure.Transporter
+	var remoter Transporter
 	if cmd == simplesocks.CmdTypeTCP {
-		domain, remoteAddr, headerOffset, err := simplesocks.ParseHeader(cmd.NetWork(), c.ClientBuf[c.ClientBufIdx:])
+		logx.Debug(c.ctx.Info + " is connecting")
+		conn, err := net.DialTimeout("tcp", c.ctx.RemoteAddr.String(), time.Second*5)
 		if err != nil {
-			logx.Error(err)
-			return
-		}
-		c.ClientBufIdx += headerOffset
-		c.ClientBufIdx += len(simplesocks.Crlf)
-		c.RemoteDomain = domain
-		c.RemoteAddr = remoteAddr
-		if c.RemoteDomain != "" {
-			c.Info = fmt.Sprintf("%s (%s)", c.RemoteDomain, c.RemoteAddr.String())
-		} else {
-			c.Info = c.RemoteAddr.String()
-		}
-
-		logx.Debug("Connecting " + c.Info)
-		conn, err := net.DialTimeout(pure.NetworkTypeTCP, c.RemoteAddr.String(), time.Second*5)
-		if err != nil {
-			err = errors.New("Connect " + c.Info + " error: " + err.Error())
+			err = errors.New(c.ctx.Info + " connect error: " + err.Error())
 			logx.Error(err)
 			return
 		}
@@ -136,91 +134,108 @@ func handleClientConn(c *trojanCtx) {
 			logx.Error(err)
 			return
 		}
-		logx.Info("Connected " + c.Info)
-		t = pure.NewTCPConn(c.CommonCtx, conn)
+		logx.Info(c.ctx.Info + " connected")
+		remoter = NewTCPConn(c.ctx, conn)
 	} else {
-		conn, err := net.ListenUDP(pure.NetworkTypeUDP, nil)
+		conn, err := net.ListenUDP("udp", nil)
 		if err != nil {
 			logx.Error(err)
 			return
 		}
-		t = pure.NewUDPConn(c.CommonCtx, conn)
-		logx.Info("Created udp pair: " + c.Info)
+		remoter = NewUDPConn(c.ctx, conn)
+		logx.Info(c.ctx.Info + " udp pair created")
 	}
 
-	c.loop(t)
+	if err := remoter.Write(); err != nil {
+		logx.Error(c.ctx.Info + " initialWriteRemote err: " + err.Error())
+		return
+	}
 
-	logx.Debug(c.Info + " tunnel closed")
+	c.loop(remoter)
+
+	logx.Debug(c.ctx.Info + " tunnel closed")
 }
 
-func (c *trojanCtx) loop(remoter pure.Transporter) {
-	done := make(chan struct{})
+func (c *trojanCtx) loop(remoter Transporter) {
+	wg := sync.WaitGroup{}
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			if err := remoter.Read(); err != nil {
 				if !errors.Is(err, io.EOF) {
-					logx.Error(c.Info + " readRemote err: " + err.Error())
+					logx.Error(c.ctx.Info + " readRemote err: " + err.Error())
 				}
 				break
 			}
-			if err := c.WriteClient(); err != nil {
-				logx.Error(c.Info + " writeClient err: " + err.Error())
+			if err := c.writeClient(); err != nil {
+				logx.Error(c.ctx.Info + " writeClient err: " + err.Error())
 				break
 			}
 		}
-		_ = c.ClientConn.(*tls.Conn).CloseWrite()
-		close(done)
+		_ = c.clientConn.(*tls.Conn).CloseWrite()
 	}()
 
 	for {
-		if err := remoter.Write(); err != nil {
-			logx.Error(c.Info + " writeRemote err: " + err.Error())
+		if err := c.readClient(); err != nil {
+			if !errors.Is(err, io.EOF) {
+				logx.Error(c.ctx.Info + " readClient err: " + err.Error())
+			}
 			break
 		}
-		if err := c.ReadClient(); err != nil {
-			if !errors.Is(err, io.EOF) {
-				logx.Error(c.Info + " readClient err: " + err.Error())
-			}
+		if err := remoter.Write(); err != nil {
+			logx.Error(c.ctx.Info + " writeRemote err: " + err.Error())
 			break
 		}
 	}
 	remoter.Close()
-	<-done
+	wg.Wait()
 }
 
-func (c *trojanCtx) ReadClient() error {
-	n, err := c.ClientConn.Read(c.ClientBuf[c.ClientBufLen:])
-	if err != nil {
-		return err
+func (c *trojanCtx) readClient() error {
+	if c.cmd == simplesocks.CmdTypeTCP {
+		n, err := c.clientConn.Read(c.ctx.ClientBuf[c.ctx.ClientBufLen:])
+		if err != nil {
+			return err
+		}
+		c.ctx.ClientBufLen += n
+	} else {
+		_, err := c.clientConn.Read(c.ctx.ClientBuf[c.ctx.ClientBufLen:])
+		if err != nil {
+			return err
+		}
+		_, _, headerOffset, err := simplesocks.ParseHeader(simplesocks.CmdTypeUDP, c.ctx.ClientBuf[c.ctx.ClientBufIdx:])
+		if err != nil {
+			return err
+		}
+		c.ctx.ClientBufIdx += headerOffset
+		bufLen := (int(c.ctx.ClientBuf[c.ctx.ClientBufIdx]) << 8) | int(c.ctx.ClientBuf[c.ctx.ClientBufIdx+1])
+		c.ctx.ClientBufIdx += 2
+		c.ctx.ClientBufIdx += len(simplesocks.Crlf)
+		c.ctx.ClientBufLen = c.ctx.ClientBufIdx + bufLen
 	}
-	c.ClientBufLen += n
 	return nil
 }
 
-func (c *trojanCtx) WriteClient() error {
-	if c.Cmd == simplesocks.CmdTypeTCP {
-		for c.RemoteBufIdx < c.RemoteBufLen {
-			n, err := c.ClientConn.Write(c.RemoteBuf[c.RemoteBufIdx:c.RemoteBufLen])
+func (c *trojanCtx) writeClient() error {
+	if c.cmd == simplesocks.CmdTypeTCP {
+		for c.ctx.RemoteBufIdx < c.ctx.RemoteBufLen {
+			n, err := c.clientConn.Write(c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen])
 			if err != nil {
 				return err
 			}
-			c.RemoteBufIdx += n
+			c.ctx.RemoteBufIdx += n
 		}
 	} else {
-		for c.RemoteBufIdx < c.RemoteBufLen {
-			header := simplesocks.BuildHeader(c.RemoteAddr.String())
-			data := c.RemoteBuf[c.RemoteBufIdx:c.RemoteBufLen]
-			header = binary.BigEndian.AppendUint16(header, uint16(len(data)))
-			header = append(header, simplesocks.Crlf...)
-			_, err := c.ClientConn.Write(append(header, data...))
-			if err != nil {
-				return err
-			}
-			c.RemoteBufIdx += len(data)
+		packet := simplesocks.BuildUDPPacket(c.ctx.RemoteAddr, c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen])
+		defer pool.Put(packet)
+		_, err := c.clientConn.Write(packet)
+		if err != nil {
+			return err
 		}
 	}
-	c.RemoteBufIdx = 0
-	c.RemoteBufLen = 0
+	c.ctx.RemoteBufIdx = 0
+	c.ctx.RemoteBufLen = 0
 	return nil
 }

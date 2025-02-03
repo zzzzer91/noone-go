@@ -1,4 +1,4 @@
-package pure
+package trojan
 
 import (
 	"net"
