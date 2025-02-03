@@ -30,7 +30,7 @@ func (c *UDPConn) Read() error {
 	}
 	offset := simplesocks.BuildUDPHeader(s, c.ctx.RemoteBuf)
 
-	c.conn.SetReadDeadline(time.Now().Add(time.Second * 10))
+	c.conn.SetReadDeadline(time.Now().Add(time.Second * 15))
 	n, addr, err := c.conn.ReadFrom(c.ctx.RemoteBuf[offset:])
 	if err != nil {
 		return err

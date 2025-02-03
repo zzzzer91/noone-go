@@ -17,7 +17,6 @@ import (
 
 type trojanCtx struct {
 	ctx        *CommonCtx
-	conf       *trojanConf
 	clientConn net.Conn
 	cmd        simplesocks.CmdType
 }
@@ -33,7 +32,7 @@ func newTrojanCtx() *trojanCtx {
 
 func (c *trojanCtx) reset() {
 	c.ctx.Reset()
-	c.conf = nil
+	c.clientConn = nil
 	c.cmd = simplesocks.CmdTypeUnspecified
 }
 
@@ -60,24 +59,23 @@ func run(conf *trojanConf) {
 			logx.Error(err)
 			continue
 		}
-		c := trojanCtxPool.Get().(*trojanCtx)
-		c.conf = conf
-		c.clientConn = conn
-		go handleClientConn(c)
+		go handleClientConn(conn, conf.hexPassword)
 	}
 }
 
-func handleClientConn(c *trojanCtx) {
-	defer trojanCtxPool.Put(c)
-	defer c.reset()
+func handleClientConn(conn net.Conn, hexPassword []byte) {
 	shouldResponseHTTP := false
 	defer func() {
 		if shouldResponseHTTP {
-			_, _ = c.clientConn.Write([]byte(fallbackHTTPBody))
+			_, _ = conn.Write([]byte(fallbackHTTPBody))
+			_ = conn.Close()
 		}
 	}()
 
-	c.ctx.ClientAddr = c.clientConn.RemoteAddr()
+	c := getTrojanCtx()
+	defer putTrojanCtx(c)
+	c.clientConn = conn
+	c.ctx.ClientAddr = conn.RemoteAddr()
 	logx.Debug("accept connect: " + c.ctx.ClientAddr.String())
 
 	offset := 0
@@ -91,7 +89,7 @@ func handleClientConn(c *trojanCtx) {
 		offset += n
 	}
 	c.ctx.ClientBufLen += offset
-	if !bytes.Equal(c.ctx.ClientBuf[:simplesocks.PasswordLength], c.conf.hexPassword) {
+	if !bytes.Equal(c.ctx.ClientBuf[:simplesocks.PasswordLength], hexPassword) {
 		logx.Error("password not equal")
 		shouldResponseHTTP = true
 		return

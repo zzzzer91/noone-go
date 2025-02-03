@@ -11,3 +11,12 @@ func init() {
 		},
 	}
 }
+
+func getTrojanCtx() *trojanCtx {
+	return trojanCtxPool.Get().(*trojanCtx)
+}
+
+func putTrojanCtx(c *trojanCtx) {
+	c.reset()
+	trojanCtxPool.Put(c)
+}
