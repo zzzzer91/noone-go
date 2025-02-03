@@ -3,7 +3,7 @@ module github.com/zzzzer91/noone
 go 1.23.1
 
 require (
-	github.com/zzzzer91/gopkg v0.0.0-20240724094029-cebef4def547
+	github.com/zzzzer91/gopkg v0.0.0-20250203050024-48ef9a78389d
 	gopkg.in/yaml.v3 v3.0.1
 )
 
