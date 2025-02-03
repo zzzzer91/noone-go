@@ -3,6 +3,7 @@ package trojan
 import (
 	"errors"
 	"net"
+	"time"
 )
 
 type UDPConn struct {
@@ -20,6 +21,7 @@ func NewUDPConn(commonCtx *CommonCtx, conn net.PacketConn) *UDPConn {
 }
 
 func (c *UDPConn) Read() error {
+	c.conn.SetReadDeadline(time.Now().Add(time.Second * 10))
 	n, addr, err := c.conn.ReadFrom(c.ctx.RemoteBuf[c.ctx.RemoteBufLen:])
 	if err != nil {
 		return err
@@ -33,12 +35,9 @@ func (c *UDPConn) Read() error {
 }
 
 func (c *UDPConn) Write() error {
-	for c.ctx.ClientBufIdx < c.ctx.ClientBufLen {
-		n, err := c.conn.WriteTo(c.ctx.ClientBuf[c.ctx.ClientBufIdx:c.ctx.ClientBufLen], c.ctx.RemoteAddr)
-		if err != nil {
-			return err
-		}
-		c.ctx.ClientBufIdx += n
+	_, err := c.conn.WriteTo(c.ctx.ClientBuf[c.ctx.ClientBufIdx:c.ctx.ClientBufLen], c.ctx.RemoteAddr)
+	if err != nil {
+		return err
 	}
 	c.ctx.ClientBufIdx = 0
 	c.ctx.ClientBufLen = 0

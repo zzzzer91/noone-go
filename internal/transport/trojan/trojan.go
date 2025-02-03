@@ -78,7 +78,8 @@ func handleClientConn(c *trojanCtx) {
 		}
 	}()
 
-	logx.Debug("accept connect: " + c.clientConn.RemoteAddr().String())
+	c.ctx.ClientAddr = c.clientConn.RemoteAddr()
+	logx.Debug("accept connect: " + c.ctx.ClientAddr.String())
 
 	offset := 0
 	for offset <= simplesocks.MinClientHeaderLength {
@@ -115,9 +116,9 @@ func handleClientConn(c *trojanCtx) {
 	c.ctx.RemoteDomain = domain
 	c.ctx.RemoteAddr = remoteAddr
 	if c.ctx.RemoteDomain != "" {
-		c.ctx.Info = fmt.Sprintf("[%s] %s (%s)", c.cmd.NetWork(), c.ctx.RemoteDomain, c.ctx.RemoteAddr.String())
+		c.ctx.Info = fmt.Sprintf("[%s] %s -> %s (%s)", c.cmd.NetWork(), c.ctx.ClientAddr.String(), c.ctx.RemoteDomain, c.ctx.RemoteAddr.String())
 	} else {
-		c.ctx.Info = fmt.Sprintf("[%s] %s", c.cmd.NetWork(), c.ctx.RemoteAddr.String())
+		c.ctx.Info = fmt.Sprintf("[%s] %s -> %s", c.cmd.NetWork(), c.ctx.ClientAddr.String(), c.ctx.RemoteAddr.String())
 	}
 
 	var remoter Transporter
@@ -174,7 +175,7 @@ func (c *trojanCtx) loop(remoter Transporter) {
 				break
 			}
 		}
-		_ = c.clientConn.(*tls.Conn).CloseWrite()
+		c.clientConn.Close()
 	}()
 
 	for {
@@ -228,11 +229,25 @@ func (c *trojanCtx) writeClient() error {
 			c.ctx.RemoteBufIdx += n
 		}
 	} else {
-		packet := simplesocks.BuildUDPPacket(c.ctx.RemoteAddr, c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen])
-		defer pool.Put(packet)
-		_, err := c.clientConn.Write(packet)
-		if err != nil {
-			return err
+		for c.ctx.RemoteBufIdx < c.ctx.RemoteBufLen {
+			data := c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen]
+			packet := simplesocks.BuildUDPPacket(c.ctx.RemoteAddr, data)
+			err := func() error {
+				defer pool.Put(packet)
+				offset := 0
+				for offset < len(packet) {
+					n, err := c.clientConn.Write(packet[offset:])
+					if err != nil {
+						return err
+					}
+					offset += n
+				}
+				return nil
+			}()
+			if err != nil {
+				return err
+			}
+			c.ctx.RemoteBufIdx += len(data)
 		}
 	}
 	c.ctx.RemoteBufIdx = 0
