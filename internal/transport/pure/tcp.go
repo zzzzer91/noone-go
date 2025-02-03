@@ -4,74 +4,46 @@ import (
 	"net"
 )
 
-type TcpCtx struct {
-	TransportCtx
-	ClientConn net.Conn
-	RemoteConn net.Conn
+type TCPConn struct {
+	ctx     *CommonCtx
+	conn    net.Conn
+	network string
 }
 
-func NewTcpCtx() *TcpCtx {
-	return &TcpCtx{
-		TransportCtx: TransportCtx{
-			Network:   "tcp",
-			ClientBuf: make([]byte, TcpClientBufCapacity),
-			RemoteBuf: make([]byte, TcpRemoteBufCapacity),
-		},
+func NewTCPConn(commonCtx *CommonCtx, conn net.Conn) *TCPConn {
+	return &TCPConn{
+		ctx:     commonCtx,
+		conn:    conn,
+		network: NetworkTypeTCP,
 	}
 }
 
-func (c *TcpCtx) Reset() {
-	c.TransportCtx.Reset()
-	if c.ClientConn != nil {
-		_ = c.ClientConn.Close()
-		c.ClientConn = nil
-	}
-	if c.RemoteConn != nil {
-		_ = c.RemoteConn.Close()
-		c.RemoteConn = nil
-	}
-}
-
-func (c *TcpCtx) ReadClient() error {
-	n, err := c.ClientConn.Read(c.ClientBuf[c.ClientBufLen:])
+func (c *TCPConn) Read() error {
+	n, err := c.conn.Read(c.ctx.RemoteBuf[c.ctx.RemoteBufLen:])
 	if err != nil {
 		return err
 	}
-	c.ClientBufLen += n
+	c.ctx.RemoteBufLen += n
 	return nil
 }
 
-func (c *TcpCtx) WriteRemote() error {
-	for c.ClientBufIdx < c.ClientBufLen {
-		n, err := c.RemoteConn.Write(c.ClientBuf[c.ClientBufIdx:c.ClientBufLen])
+func (c *TCPConn) Write() error {
+	for c.ctx.ClientBufIdx < c.ctx.ClientBufLen {
+		n, err := c.conn.Write(c.ctx.ClientBuf[c.ctx.ClientBufIdx:c.ctx.ClientBufLen])
 		if err != nil {
 			return err
 		}
-		c.ClientBufIdx += n
+		c.ctx.ClientBufIdx += n
 	}
-	c.ClientBufIdx = 0
-	c.ClientBufLen = 0
+	c.ctx.ClientBufIdx = 0
+	c.ctx.ClientBufLen = 0
 	return nil
 }
 
-func (c *TcpCtx) ReadRemote() error {
-	n, err := c.RemoteConn.Read(c.RemoteBuf[c.RemoteBufLen:])
-	if err != nil {
-		return err
-	}
-	c.RemoteBufLen += n
-	return nil
+func (c *TCPConn) Close() {
+	_ = c.conn.(*net.TCPConn).CloseWrite()
 }
 
-func (c *TcpCtx) WriteClient() error {
-	for c.RemoteBufIdx < c.RemoteBufLen {
-		n, err := c.ClientConn.Write(c.RemoteBuf[c.RemoteBufIdx:c.RemoteBufLen])
-		if err != nil {
-			return err
-		}
-		c.RemoteBufIdx += n
-	}
-	c.RemoteBufIdx = 0
-	c.RemoteBufLen = 0
-	return nil
+func (c *TCPConn) Network() string {
+	return c.network
 }
