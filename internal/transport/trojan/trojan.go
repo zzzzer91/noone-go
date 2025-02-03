@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/zzzzer91/gopkg/logx"
-	"github.com/zzzzer91/gopkg/pool"
 	"github.com/zzzzer91/noone/internal/config"
 	"github.com/zzzzer91/noone/internal/protocol/simplesocks"
 )
@@ -220,35 +219,12 @@ func (c *trojanCtx) readClient() error {
 }
 
 func (c *trojanCtx) writeClient() error {
-	if c.cmd == simplesocks.CmdTypeTCP {
-		for c.ctx.RemoteBufIdx < c.ctx.RemoteBufLen {
-			n, err := c.clientConn.Write(c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen])
-			if err != nil {
-				return err
-			}
-			c.ctx.RemoteBufIdx += n
+	for c.ctx.RemoteBufIdx < c.ctx.RemoteBufLen {
+		n, err := c.clientConn.Write(c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen])
+		if err != nil {
+			return err
 		}
-	} else {
-		for c.ctx.RemoteBufIdx < c.ctx.RemoteBufLen {
-			data := c.ctx.RemoteBuf[c.ctx.RemoteBufIdx:c.ctx.RemoteBufLen]
-			packet := simplesocks.BuildUDPPacket(c.ctx.RemoteAddr, data)
-			err := func() error {
-				defer pool.Put(packet)
-				offset := 0
-				for offset < len(packet) {
-					n, err := c.clientConn.Write(packet[offset:])
-					if err != nil {
-						return err
-					}
-					offset += n
-				}
-				return nil
-			}()
-			if err != nil {
-				return err
-			}
-			c.ctx.RemoteBufIdx += len(data)
-		}
+		c.ctx.RemoteBufIdx += n
 	}
 	c.ctx.RemoteBufIdx = 0
 	c.ctx.RemoteBufLen = 0

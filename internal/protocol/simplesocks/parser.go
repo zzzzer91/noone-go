@@ -6,7 +6,6 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/zzzzer91/gopkg/pool"
 	"github.com/zzzzer91/noone/internal/manager"
 )
 
@@ -60,6 +59,10 @@ func ParseHeader(cmd CmdType, buf []byte) (domain string, addr net.Addr, offset 
 	port := (int(buf[offset]) << 8) | int(buf[offset+1])
 	offset += 2
 
+	if domain != "" {
+		domain = domain + ":" + strconv.Itoa(port)
+	}
+
 	switch cmd {
 	case CmdTypeTCP:
 		addr = &net.TCPAddr{
@@ -79,40 +82,32 @@ func ParseHeader(cmd CmdType, buf []byte) (domain string, addr net.Addr, offset 
 	return
 }
 
-func BuildUDPPacket(addr net.Addr, data []byte) []byte {
-	packet := pool.Get(len(data) + MaxUDPHeaderLength)
-	host, port, err := net.SplitHostPort(addr.String())
-	if err != nil {
-		return nil
-	}
+func BuildUDPHeader(addr string, data []byte) int {
+	host, port, _ := net.SplitHostPort(addr)
 	if ip := net.ParseIP(host); ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
-			packet = packet[:1+net.IPv4len]
-			packet[0] = atypIpv4
-			copy(packet[1:], ip4)
+			data = data[:1+net.IPv4len]
+			data[0] = atypIpv4
+			copy(data[1:], ip4)
 		} else {
-			packet = packet[:1+net.IPv6len]
-			packet[0] = atypIpv6
-			copy(packet[1:], ip)
+			data = data[:1+net.IPv6len]
+			data[0] = atypIpv6
+			copy(data[1:], ip)
 		}
 	} else {
 		if len(host) > 255 {
-			return nil
+			return 0
 		}
-		packet = packet[:1+1+len(host)]
-		packet[0] = atypDomain
-		packet[1] = byte(len(host))
-		copy(packet[2:], host)
+		data = data[:1+1+len(host)]
+		data[0] = atypDomain
+		data[1] = byte(len(host))
+		copy(data[2:], host)
 	}
 
-	portnum, err := strconv.ParseUint(port, 10, 16)
-	if err != nil {
-		return nil
-	}
-	packet = binary.BigEndian.AppendUint16(packet, uint16(portnum))
-	packet = binary.BigEndian.AppendUint16(packet, uint16(len(data)))
-	packet = append(packet, Crlf...)
-	packet = append(packet, data...)
+	portnum, _ := strconv.ParseUint(port, 10, 16)
+	data = binary.BigEndian.AppendUint16(data, uint16(portnum))
+	data = append(data, 0, 0)
+	data = append(data, Crlf...)
 
-	return packet
+	return len(data)
 }
